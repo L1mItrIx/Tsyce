@@ -11,7 +11,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 
 ## Fase 1 — Runner
 - [x] F1.1 `runner/detect.ts`: binario de curl y versión mínima 7.83.0
-- [ ] F1.2 `runner/curl-args.ts`: request → `string[]`
+- [x] F1.2 `runner/curl-args.ts`: request → `string[]`
 - [ ] F1.3 `runner/exec.ts`: spawn, `-w`, `-o`, temporales, errores
 - [ ] F1.4 Tests de integración con servidor `node:http`: 200 JSON, 404, puerto cerrado, timeout, redirect
 
@@ -58,9 +58,12 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-12 — La fase 0 se trabaja en la rama `claude/bold-albattani-fsyz04` (asignada por la sesión) en vez de `fase-0-<slug>`.
 - 2026-11-12 — F0.3: `ink-testing-library` 4.0.0 funciona con Ink 8.0.0 + React 19.3 (`render`, `lastFrame()`, `stdin.write()`); el riesgo de PLAN §11 queda descartado, no hace falta el plan B.
 - 2026-11-12 — F1.1: el helper `spawnCollect` y `CurlUnavailableError` viven en `runner/exec.ts` (único lugar que hace `spawn`); `detect.ts` los importa.
+- 2026-11-12 — F1.2: el esquema de `request` nace ya en `schema.ts` (el tipo sale de zod); opciones planas en `request` (`followRedirects`, `insecure`, `compressed`, `timeoutMs`); body `{ json }` o `{ text }`. `curl-args` siempre añade `--globoff` y `--url` (URL literal), y solo pasa `--request` cuando el método no es el que curl ya infiere.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.
+
+- Headers repetidos (mismo nombre varias veces): `headers` es un mapa y no los representa.
 
 ## Bloqueos
 Qué impide avanzar y qué se necesita del usuario.
