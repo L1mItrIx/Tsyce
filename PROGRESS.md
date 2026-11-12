@@ -35,7 +35,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 - [x] F4.7 `httpi import` + oráculo curlconverter en tests
 
 ## Fase 5 — Modo guiado
-- [ ] F5.1 Reducer puro del asistente (sin Ink) con tests
+- [x] F5.1 Reducer puro del asistente (sin Ink) con tests; commit `F5.1: add pure request wizard reducer`
 - [ ] F5.2 Pantallas Ink: método → URL → headers → body
 - [ ] F5.3 Menú de asserts a partir de la respuesta real
 - [ ] F5.4 `httpi new` escribe el YAML
@@ -78,6 +78,8 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-11 — F6.1: `httpi export <archivo> --dialect bash|cmd|powershell` exporta todas las requests a stdout, con `--env` y `--var` y sin asserts. Reutiliza `buildCurlArgs`; salida contiene los secretos resueltos. Bash genera un comando; cmd un script `.cmd` (porcentajes duplicados y expansión retardada desactivada), no una línea para pegar en el prompt. PowerShell requiere 7.3+ y `Standard` para preservar comillas al invocar `curl.exe`. NUL se rechaza en todos; saltos de línea literales se rechazan en cmd con salida 2.
 - 2026-11-11 — F6.1: comprobación local en Linux/Node 24: 381 tests, typecheck y build; ejecución real Bash/curl conserva URL, headers y body. Los e2e ejecutan también cmd y PowerShell en Windows dentro de la matriz CI; resultado remoto pendiente.
 
+- 2026-11-11 — El usuario autoriza completar F5 sin el prototipo y continuar el proyecto; nombre elegido para npm: `httpi-cli`. Se conserva la rama indicada.
+
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.
 
@@ -95,7 +97,7 @@ Ideas que surgieron y no se hicieron. No implementar sin aprobación.
 ## Bloqueos
 Qué impide avanzar y qué se necesita del usuario.
 
-- El prototipo en Ink del usuario no está en el repo. Bloquea la fase 5: el reducer (F5.1) y las pantallas (F5.2) deben partir de su flujo.
+- Prototipo de Ink ausente: desbloqueado por instrucción del usuario de completar la fase 5 creando el flujo desde cero.
 - Los fixtures de `test/fixtures/curl/` están escritos a mano con el formato de DevTools, no copiados de un navegador real. Hace falta que el usuario pegue curls reales ("Copy as cURL (bash)" y "(cmd)") para validar el riesgo de comillas de PLAN §11.
 - Sin verificar en cmd: cómo escapa DevTools una barra invertida dentro del body (p. ej. `\n` en JSON) en "Copy as cURL (cmd)". Se quitó ese caso del fixture inventado hasta tener un pegado real.
 - Decisión pendiente del usuario: `{{nombre}}` consulta el entorno del sistema antes que `httpi.env.yaml` (precedencia de PLAN §4). En Windows las variables de entorno no distinguen mayúsculas, así que un `{{path}}` o `{{username}}` del archivo de entornos quedaría tapado por el del sistema.
