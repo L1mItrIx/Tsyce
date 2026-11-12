@@ -20,7 +20,7 @@ beforeAll(async () => {
     if (req.url === '/login') {
       token = `PROJECT_TOKEN_${calls.length}`;
       res.end(JSON.stringify({ access_token: token }));
-    } else if (req.url === '/health') {
+    } else if (req.url?.startsWith('/health')) {
       res.end('{"ok":true}');
     } else {
       res.writeHead(req.headers.authorization === `Bearer ${token}` ? 200 : 401);
@@ -178,6 +178,35 @@ test('a failed login stops the whole project and reports the files that did not 
   expect(result.stdout).toContain('Admin A\n\n- not run: the flow stopped before this file');
   expect(result.stdout).toContain('4 files, 1 test: 0 passed, 1 failed');
   expect(result.code).toBe(1);
+});
+
+const captureFiles = async (run: string[]) => {
+  await write('httpi.yaml', { version: 1, run });
+  await write('tests/create.yaml', {
+    version: 1,
+    tests: [{ name: 'create', request: { url: `${baseUrl}/health` }, capture: { healthy: '$.ok' } }],
+  });
+  await write('tests/use.yaml', {
+    version: 1,
+    tests: [{ name: 'use {{healthy}}', request: { url: `${baseUrl}/health?seen={{healthy}}` }, expect: { status: 200 } }],
+  });
+};
+
+test('a value captured in one file is available in the files that run after it', async () => {
+  await captureFiles(['tests/create.yaml', 'tests/use.yaml']);
+  const result = await httpi(['run'], { cwd: root });
+  expect(calls).toEqual(['GET /health', 'GET /health?seen=true']);
+  expect(result.stdout).toContain('    ✓ capture healthy from $.ok');
+  expect(result.stdout).toContain('✓ use true (200,');
+  expect(result.code).toBe(0);
+});
+
+test('exit 2 before sending anything when a file uses a value that is only captured later', async () => {
+  await captureFiles(['tests/use.yaml', 'tests/create.yaml']);
+  const result = await httpi(['run', '--var', 'healthy=stale'], { cwd: root });
+  expect(result.stderr).toBe('httpi: unresolved variable: {{healthy}}\n');
+  expect(calls).toEqual([]);
+  expect(result.code).toBe(2);
 });
 
 test('exit 2 before sending anything when a later file uses a variable nobody defines', async () => {

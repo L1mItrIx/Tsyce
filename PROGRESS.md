@@ -74,7 +74,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 
 ### V2 — Capturas generales
 - [x] V2.1 `capture` como mapa `{ nombre: jsonpath }` (`authToken` conserva su comportamiento)
-- [ ] V2.2 Variables capturadas compartidas entre archivos y validación previa de referencias
+- [x] V2.2 Variables capturadas compartidas entre archivos y validación previa de referencias
 
 ### V3 — Datos
 - [ ] V3.1 `data.ts`: parser CSV (RFC 4180) y lector JSON → filas
@@ -163,6 +163,7 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-12 — V1.2: `httpi run` sin argumento (o con la ruta de un `httpi.yaml`) ejecuta el proyecto como un solo flujo: el token capturado en un archivo vale para los siguientes y un login fallido detiene todo el proyecto (los archivos no alcanzados salen como "not run"). Todas las variables se validan antes de enviar nada. Entorno: `--env` o `env.default`; si `httpi.yaml` declara `env`, `httpi.env.yaml` se ignora con aviso; si no, se sigue leyendo. `httpi run <archivo>` no cambia y no consulta `httpi.yaml` (no se hizo la delegación de `readEnvironment` que mencionaba el plan, para no alterar el comportamiento actual). Título de cada archivo en el reporte: su `name` o su ruta relativa; el `name` del proyecto aún no se muestra.
 - 2026-11-12 — V1.3: `report.junit` se escribe en cada corrida del proyecto (ruta relativa a `httpi.yaml`, crea la carpeta y reemplaza el reporte anterior), además del reporte elegido por stdout y también cuando hay fallos. No se escribe si la corrida se aborta antes de enviar (salida 2).
 - 2026-11-12 — V2.1: `capture` es un mapa `nombre: JSONPath`. Cada ruta debe seleccionar exactamente un texto, número o booleano (se guarda como texto). Un test con `capture` es requisito de lo que sigue: si la request falla, sus asserts fallan o una captura no se obtiene, el flujo se detiene (salida 1). Un nombre capturado queda reservado en toda la corrida: no cae a `--var` ni al sistema antes de capturarse. Solo `authToken` oculta la respuesta y se redacta. En MCP un valor capturado no puede usarse en la URL (decidiría el destino en tiempo de ejecución).
+- 2026-11-12 — V2.2: no requirió código nuevo: el bucle multiarchivo de V1.2 y la reserva de nombres de V2.1 ya comparten capturas entre archivos y validan el orden antes de enviar; se añadieron los e2e que lo fijan.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.
