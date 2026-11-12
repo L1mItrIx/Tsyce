@@ -4,6 +4,7 @@ import type { RequestSpec, Expect } from '../core/schema.js';
 import type { RunResult } from '../core/runner/exec.js';
 import { RequestWizard } from './request-wizard.js';
 import { AssertionMenu } from './assertion-menu.js';
+import { MouseProvider, MouseTarget } from './mouse-controls.js';
 
 type SendRequest = (request: RequestSpec, signal: AbortSignal) => Promise<RunResult>;
 type Completed = { request: RequestSpec; expected: Expect };
@@ -21,6 +22,7 @@ export function NewWizard({ sendRequest, onComplete, onCancel, onError }: NewWiz
   const [error, setError] = useState('');
   const controller = useRef(new AbortController());
   const finished = useRef(false);
+  const sending = useRef(false);
   useEffect(() => () => { controller.current.abort(); }, []);
   const cancel = () => {
     if (finished.current) return;
@@ -29,6 +31,8 @@ export function NewWizard({ sendRequest, onComplete, onCancel, onError }: NewWiz
     onCancel();
   };
   const send = async (value: RequestSpec) => {
+    if (finished.current || sending.current) return;
+    sending.current = true;
     setRequest(value); setMode('running'); setError('');
     try {
       const result = await sendRequest(value, controller.current.signal);
@@ -40,6 +44,8 @@ export function NewWizard({ sendRequest, onComplete, onCancel, onError }: NewWiz
       const failure = cause instanceof Error ? cause : new Error(String(cause));
       if (onError) { finished.current = true; onError(failure); }
       else { setError(failure.message); setMode('error'); }
+    } finally {
+      sending.current = false;
     }
   };
   useInput((input, key) => {
@@ -55,6 +61,13 @@ export function NewWizard({ sendRequest, onComplete, onCancel, onError }: NewWiz
   return <Box flexDirection="column">
     <Text>{mode === 'running' ? 'Sending request… Ctrl+C: cancel' : `Request failed: ${JSON.stringify(error)}`}</Text>
     {mode === 'error' && <Text>Enter: retry · Esc: edit · Ctrl+C: cancel</Text>}
+    <Box gap={2}>
+      {mode === 'error' && <>
+        <MouseTarget onClick={() => { if (request) void send(request); }}><Text>[ Retry ]</Text></MouseTarget>
+        <MouseTarget onClick={() => setMode('form')}><Text>[ Edit request ]</Text></MouseTarget>
+      </>}
+      <MouseTarget onClick={cancel}><Text>[ Cancel ]</Text></MouseTarget>
+    </Box>
   </Box>;
 }
 
@@ -63,10 +76,10 @@ export async function launchWizard(sendRequest: SendRequest): Promise<Completed 
   let instance: ReturnType<typeof render> | undefined;
   try {
     return await new Promise<Completed | null>((resolve, reject) => {
-      instance = render(<NewWizard sendRequest={sendRequest}
+      instance = render(<MouseProvider><NewWizard sendRequest={sendRequest}
         onComplete={(request, expected) => resolve({ request, expected })}
-        onCancel={() => resolve(null)} onError={reject} />,
-      { stdout: process.stderr, exitOnCtrlC: false, patchConsole: false });
+        onCancel={() => resolve(null)} onError={reject} /></MouseProvider>,
+      { stdout: process.stderr, exitOnCtrlC: false, patchConsole: false, alternateScreen: true, interactive: true });
     });
   } finally {
     instance?.unmount();

@@ -62,6 +62,30 @@ y nunca sobrescribe un archivo existente. La selección ofrece status, tiempo,
 headers y comparadores JSON (`exists`, `type`, `equals`, `contains`, `matches`).
 En respuestas grandes se limita la lista para mantener manejable el menú.
 
+### Mouse, headers y body
+
+En Windows Terminal, la terminal de VS Code u otra terminal compatible con mouse
+SGR, puedes hacer clic en los métodos y en los botones **Next**, **Back**, **Cancel**
+y **Send request**. En la respuesta, haz clic en los asserts para marcarlos y en
+**Save test** para guardar. La rueda desplaza el formulario si no cabe en la ventana
+y recorre las opciones del menú de asserts. El asistente usa una pantalla alternativa
+y restaura la terminal al salir. El teclado sigue funcionando; Shift permite usar la
+selección de texto propia de las terminales que ofrecen ese atajo.
+
+**Headers** son datos adicionales de la request: `Content-Type: application/json`
+indica que envías JSON y `Authorization: Bearer ...` puede identificarte ante una API.
+Un GET público como `https://jsonplaceholder.typicode.com/posts/1` normalmente no
+necesita headers: haz clic en **Skip headers**.
+
+**Body** es el contenido que envías. POST, PUT y PATCH suelen usarlo, por ejemplo
+`{"name":"Ana"}`. Un GET o HEAD normalmente no necesita body: usa **No body**.
+El formulario incluye **Add JSON header** y **Use JSON example**; este último añade
+`Content-Type: application/json` si no lo habías definido. El ejemplo es editable:
+debes adaptarlo a los campos que espera tu API.
+
+Seleccionar un método, añadir un ejemplo o avanzar no envía nada. Solo **Send request**
+o Enter en la pantalla de confirmación realiza la llamada.
+
 ## Importar un curl
 
 ```bash

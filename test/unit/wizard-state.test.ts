@@ -77,3 +77,13 @@ test('custom methods remain editable and method arrows cannot change later stage
   expect(state.request.method).toBe('PROPFIND');
   expect(wizardReducer(state, { type: 'move-method', direction: 1 })).toBe(state);
 });
+
+test('the JSON body preset adds the required content type without overwriting an existing one', () => {
+  const state = { ...createWizardState(), step: 'body' as const };
+  const json = wizardReducer(state, { type: 'json-example' });
+  expect(JSON.parse(json.input)).toEqual({ name: 'Ana' });
+  expect(json.request.headers['Content-Type']).toBe('application/json');
+  const custom = { ...state, request: { ...state.request, headers: { 'content-type': 'application/custom+json', Authorization: 'Bearer fake' } } };
+  expect(wizardReducer(custom, { type: 'json-example' }).request.headers).toEqual(custom.request.headers);
+  expect(wizardReducer(createWizardState(), { type: 'json-example' }).step).toBe('method');
+});

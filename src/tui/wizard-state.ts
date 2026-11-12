@@ -9,7 +9,7 @@ const wizardStateSchema = z.object({
 });
 export type WizardState = z.infer<typeof wizardStateSchema>;
 export type WizardAction = { type: 'input'; value: string } | { type: 'next' | 'back' | 'cancel' }
-  | { type: 'move-method'; direction: -1 | 1 };
+  | { type: 'move-method'; direction: -1 | 1 } | { type: 'json-example' };
 
 export function createWizardState(): WizardState {
   return { step: 'method', input: '', error: null, request: { method: 'GET', url: '', headers: {} } };
@@ -49,6 +49,12 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
   if (state.step === 'ready' || state.step === 'cancelled') return state;
   if (action.type === 'cancel') return { ...state, step: 'cancelled', error: null };
   if (action.type === 'input') return { ...state, input: action.value, error: null };
+  if (action.type === 'json-example') {
+    if (state.step !== 'body') return state;
+    const hasContentType = Object.keys(state.request.headers).some((name) => name.toLowerCase() === 'content-type');
+    const headers = hasContentType ? state.request.headers : { ...state.request.headers, 'Content-Type': 'application/json' };
+    return { ...state, input: '{\n  "name": "Ana"\n}', request: { ...state.request, headers }, error: null };
+  }
   if (action.type === 'move-method') {
     if (state.step !== 'method') return state;
     const method = state.input.trim().toUpperCase() || state.request.method;

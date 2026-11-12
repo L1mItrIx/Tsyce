@@ -54,6 +54,8 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 - [x] U1 Selector visual de métodos HTTP y marco de terminal; commit `U1: add visual HTTP method selection to the request wizard`.
 - [x] U2 Ejecución de archivos con respuestas visibles y ejemplo GET/POST por ambiente; commit `U2: show API responses when running request files`.
 
+- [x] U3 Mouse para el asistente, botones y ayudas de headers/body; commit `U3: add mouse controls and explain optional request fields`.
+
 ## Decisiones
 Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 
@@ -91,6 +93,10 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-11 — F7.4: nombre `httpi-cli`, versión 0.1.0 y bin `httpi`; prepack ejecuta check. Tarball verificado: 29 archivos, ~28 kB; instalación aislada con dependencias de producción, `run --reporter junit` y asistente Ink probados. El usuario decide dejar la publicación npm pendiente; no se ha publicado. F6.2 (`fetch`) continúa opcional y pendiente.
 
 - 2026-11-11 — U1/U2 solicitadas explícitamente por el usuario: métodos visibles con selección por flechas y marco de terminal inspirado en la referencia; `run --show-response` muestra status, headers repetidos y body junto a los asserts sin interacción. JUnit rechaza ese flag con salida 2. `examples/requests.yaml` contiene GET y POST contra el servidor local, que responde al POST sin persistir. Verificado con 422 tests, navegación en TTY y ejecución real del archivo (2 tests pasaron).
+
+- 2026-11-11 — El usuario solicita explícitamente mouse en el asistente; se incorpora U3 como excepción al alcance inicial de solo teclado. Se usa SGR en pantalla alternativa, sin dependencias nuevas; la publicación npm sigue aplazada.
+
+- 2026-11-11 — U3: clics en métodos, navegación, presets JSON, envío, asserts y guardado; rueda para formularios altos y opciones. Las posiciones se miden al recibir el evento y se ajustan al scroll. El parser admite secuencias fragmentadas e ignora eventos de mouse dentro de pegados delimitados. Se restauran mouse y pantalla al salir. Sin dependencias nuevas. Verificado con 432 tests y recorrido SGR en TTY: POST 201, YAML guardado y ejecutado correctamente; un doble clic de reintento no duplica requests.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.

@@ -8,6 +8,8 @@ import { runRequest } from '../../src/core/runner/exec.js';
 import { detectCurl } from '../../src/core/runner/detect.js';
 import { checkExpectations } from '../../src/core/asserts.js';
 import type { RequestSpec, Expect } from '../../src/core/schema.js';
+import { MouseProvider } from '../../src/tui/mouse-controls.js';
+import { clickLabel } from './mouse-helpers.js';
 
 afterEach(cleanup);
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -62,4 +64,30 @@ test('network failure offers retry/edit rather than saving assertions; Ctrl+C ab
   await key('\u0003');
   await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
   expect(signal?.aborted).toBe(true);
+});
+
+test('mouse retry cannot send duplicate requests and mouse Cancel aborts the active retry', async () => {
+  const failure = { status: 0, timeMs: 1, headers: {}, body: '', curlExitCode: 7, error: 'connection refused' };
+  const cancel = vi.fn(); let activeSignal: AbortSignal | undefined;
+  const send = vi.fn((_request: RequestSpec, signal: AbortSignal) => {
+    if (send.mock.calls.length === 1) return Promise.resolve(failure);
+    activeSignal = signal;
+    return new Promise<typeof failure>((resolve) => { signal.addEventListener('abort', () => resolve(failure), { once: true }); });
+  });
+  let app!: ReturnType<typeof render>;
+  await act(async () => { app = render(<MouseProvider><NewWizard sendRequest={send} onComplete={vi.fn()} onCancel={cancel} /></MouseProvider>); });
+  await clickLabel(app, '[ Next ]');
+  await act(async () => { app.stdin.write('http://example.test'); });
+  await clickLabel(app, '[ Next ]'); await clickLabel(app, '[ Skip headers ]'); await clickLabel(app, '[ No body ]');
+  await clickLabel(app, '[ Send request ]');
+  await vi.waitFor(() => expect(app.lastFrame()).toContain('[ Retry ]'));
+  const lines = app.lastFrame()!.split('\n');
+  const row = lines.findIndex((line) => line.includes('[ Retry ]'));
+  const col = lines[row]!.indexOf('[ Retry ]');
+  await act(async () => { app.stdin.write(`\u001b[<0;${col + 1};${row + 1}M`.repeat(2)); });
+  expect(send).toHaveBeenCalledTimes(2);
+  await clickLabel(app, '[ Cancel ]');
+  expect(cancel).toHaveBeenCalledOnce();
+  expect(activeSignal?.aborted).toBe(true);
+  await act(async () => { app.unmount(); });
 });
