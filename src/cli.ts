@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { text } from 'node:stream/consumers';
 import { Command, InvalidArgumentError, Option } from 'commander';
+import { CurlExportError, exportCurl } from './core/exporter/curl.js';
 import {
   readEnvironment,
   readTestFile,
@@ -70,7 +71,21 @@ async function importCommand(curlFile: string | undefined, options: ImportOption
   return EXIT.ok;
 }
 
-const INPUT_ERRORS = [TestFileError, UnresolvedVariableError, ShellSyntaxError, CurlImportError];
+type ExportOptions = RunOptions & { dialect: Dialect };
+
+async function exportCommand(path: string, options: ExportOptions): Promise<ExitCode> {
+  const file = resolveVars(await readTestFile(path), {
+    cli: options.var,
+    system: process.env,
+    file: options.env === undefined ? {} : await readEnvironment(path, options.env),
+  });
+  // Generate everything before writing: a bad request must not leave a partial script.
+  const commands = file.tests.map(({ request }) => exportCurl(request, options.dialect));
+  process.stdout.write(`${commands.join('\n\n')}\n`);
+  return EXIT.ok;
+}
+
+const INPUT_ERRORS = [TestFileError, UnresolvedVariableError, ShellSyntaxError, CurlImportError, CurlExportError];
 
 /** Runs a command and turns its outcome or its known errors into the process exit code. */
 async function finish(command: Promise<ExitCode>): Promise<void> {
@@ -113,5 +128,14 @@ program
   .option('--name <name>', 'name of the test (default: method and path)')
   .option('--keep-secrets', 'keep Authorization and Cookie values in the file instead of {{variables}}')
   .action((curlFile: string | undefined, options: ImportOptions) => finish(importCommand(curlFile, options)));
+
+program
+  .command('export')
+  .description('export requests as curl scripts (assertions are not exported; output includes resolved secrets)')
+  .argument('<file>', 'test file (YAML or JSON); exports every request in order')
+  .addOption(new Option('--dialect <shell>', 'bash command, cmd batch file, or PowerShell 7.3+ script').choices(DIALECTS).default('bash'))
+  .option('--env <name>', 'environment from httpi.env.yaml')
+  .option('--var <name=value>', 'set a variable; repeatable, wins over the environment', collectVar, {})
+  .action((path: string, options: ExportOptions) => finish(exportCommand(path, options)));
 
 await program.parseAsync();

@@ -41,7 +41,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 - [ ] F5.4 `httpi new` escribe el YAML
 
 ## Fase 6 — Exportar
-- [ ] F6.1 Exportar curl por dialecto (`curl.exe` en PowerShell)
+- [x] F6.1 Exportar curl por dialecto (`curl.exe` en PowerShell); commit `F6.1: export curl scripts for Bash, cmd and PowerShell`
 - [ ] F6.2 (Opcional) Exportar a `fetch`
 
 ## Fase 7 — CI y publicación
@@ -73,6 +73,10 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-12 — F4.5: nuevo body `{ form: [...] }` (expresiones `-F` de curl tal cual) para representar multipart. `-u` se convierte en header `Authorization: Basic …`; `-b`, `-A`, `-e` en headers. El body importado siempre se guarda como `{ text }` sin re-serializar. Todo flag fuera de la lista blanca avisa, incluidos `-s`/`-S`/`-v`; hay una lista de flags de curl con valor solo para saltar su valor y no confundirlo con la URL. `@archivo` en `-d`/`-b` avisa y se ignora.
 - 2026-11-12 — F4.6: se consideran secretos los headers `Authorization` y `Cookie` (cubre `-u` y `-b`). Variables propuestas: `token` (Bearer), `basicAuth` (Basic), `authorization` (otros) y `cookie`. `extractSecrets` vive en `map-flags.ts`.
 - 2026-11-12 — F4.7: `httpi import [archivo]` lee el curl de un archivo o de stdin y escribe YAML a stdout o a `-o` (no pisa un archivo existente). Por defecto sustituye los secretos por `{{variable}}` y avisa por stderr sin mostrar el valor; `--keep-secrets` los deja. El test importado sale sin `expect` (no se inventa un status). curl real rechaza `--flag=valor`: se lee igual (PLAN §3) pero con advertencia. Oráculo: 25 comandos Bash coinciden con curlconverter (PLAN §8 hablaba de ~50 curls reales).
+
+- 2026-11-11 — El usuario autoriza adelantar F6.1 mientras falta el prototipo de F5; se continúa en `claude/bold-albattani-fsyz04` por instrucción explícita.
+- 2026-11-11 — F6.1: `httpi export <archivo> --dialect bash|cmd|powershell` exporta todas las requests a stdout, con `--env` y `--var` y sin asserts. Reutiliza `buildCurlArgs`; salida contiene los secretos resueltos. Bash genera un comando; cmd un script `.cmd` (porcentajes duplicados y expansión retardada desactivada), no una línea para pegar en el prompt. PowerShell requiere 7.3+ y `Standard` para preservar comillas al invocar `curl.exe`. NUL se rechaza en todos; saltos de línea literales se rechazan en cmd con salida 2.
+- 2026-11-11 — F6.1: comprobación local en Linux/Node 24: 381 tests, typecheck y build; ejecución real Bash/curl conserva URL, headers y body. Los e2e ejecutan también cmd y PowerShell en Windows dentro de la matriz CI; resultado remoto pendiente.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.
