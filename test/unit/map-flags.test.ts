@@ -14,9 +14,9 @@ function table(cases: Case[]) {
   });
 }
 
-describe('method and API', () => {
+describe('method and URL', () => {
   table([
-    ['a bare API is a GET', [API], GET],
+    ['a bare URL is a GET', [API], GET],
     ['--url', ['--url', API], GET],
     ['-X', ['-X', 'DELETE', API], { ...GET, method: 'DELETE' }],
     ['--request, lowercase method is normalized', ['--request', 'patch', API], { ...GET, method: 'PATCH' }],
@@ -123,7 +123,7 @@ describe('flags outside the whitelist', () => {
   table([
     ['unknown boolean flag', ['--http2', '-v', API], GET, ['unsupported flag --http2 was ignored', 'unsupported flag -v was ignored']],
     [
-      'known curl flag with a value: the value is not taken for the API',
+      'known curl flag with a value: the value is not taken for the URL',
       ['-o', 'out.json', '--proxy', 'http://proxy:8080', '--connect-timeout=5', API],
       GET,
       [
@@ -143,7 +143,7 @@ describe('errors', () => {
   test.each<[name: string, tokens: string[], message: string]>([
     ['empty input', [], 'nothing to import: the input is empty'],
     ['not curl', ['wget', API], 'expected a curl command, but it starts with "wget"'],
-    ['no API', ['curl', '-X', 'POST'], 'the curl command has no API'],
+    ['no URL', ['curl', '-X', 'POST'], 'the curl command has no URL'],
     ['a method that is not a word', ['curl', '-X', 'GET /x', API], 'the curl command does not describe a valid request'],
   ])('%s', (_name, tokens, message) => {
     expect(() => mapFlags(tokens)).toThrow(CurlImportError);
