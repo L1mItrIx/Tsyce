@@ -1,4 +1,5 @@
 import { createServer, type Server } from 'node:http';
+import { act } from 'react';
 import type { AddressInfo } from 'node:net';
 import { afterEach, expect, test, vi } from 'vitest';
 import { cleanup, render } from 'ink-testing-library';
@@ -9,6 +10,7 @@ import { checkExpectations } from '../../src/core/asserts.js';
 import type { RequestSpec, Expect } from '../../src/core/schema.js';
 
 afterEach(cleanup);
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 const tick = () => new Promise((resolve) => setTimeout(resolve, 50));
 
 test('confirmed request runs real curl, then selection produces passing assertions', async () => {
@@ -20,7 +22,11 @@ test('confirmed request runs real curl, then selection produces passing assertio
     const curl = await detectCurl();
     const done = vi.fn<(request: RequestSpec, expected: Expect) => void>();
     const app = render(<NewWizard sendRequest={(request, signal) => runRequest(curl.bin, request, signal)} onComplete={done} onCancel={vi.fn()} />);
-    const key = async (input: string) => { app.stdin.write(input); await tick(); };
+    const key = async (input: string) => {
+      // A visible Ink frame precedes passive input effects. Flush them before typing.
+      await act(async () => {});
+      await act(async () => { app.stdin.write(input); });
+    };
     await tick(); await key('\r');
     await key(`http://127.0.0.1:${(server.address() as AddressInfo).port}/test`); await key('\r');
     await key('\t'); await key('\t');
@@ -46,7 +52,10 @@ test('network failure offers retry/edit rather than saving assertions; Ctrl+C ab
     return { status: 0, timeMs: 1, headers: {}, body: '', curlExitCode: 7, error: 'connection refused' };
   });
   const app = render(<NewWizard sendRequest={send} onComplete={complete} onCancel={cancel} />);
-  const key = async (input: string) => { app.stdin.write(input); await tick(); };
+  const key = async (input: string) => {
+    await act(async () => {});
+    await act(async () => { app.stdin.write(input); });
+  };
   await tick(); await key('\r'); await key('http://example.test'); await key('\r'); await key('\t'); await key('\t'); await key('\r');
   await vi.waitFor(() => expect(app.lastFrame()).toContain('connection refused'));
   expect(complete).not.toHaveBeenCalled();

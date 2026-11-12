@@ -48,7 +48,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 - [x] F7.1 Reporter JUnit; commit `F7.1: add JUnit XML output for CI`
 - [x] F7.2 README con ejemplo de GitHub Actions; commit `F7.2: document the CLI with a runnable API and CI example`
 - [x] F7.3 Publicar `httpi.schema.json`; commit `F7.3: generate and publish JSON Schema from zod`
-- [ ] F7.4 Decidir nombre en npm (pendiente del usuario) y `npm publish`
+- [~] F7.4 Nombre elegido: `httpi-cli`; preparar 0.1.0 y publicar (falta autenticación npm); rama `claude/bold-albattani-fsyz04`
 
 ## Decisiones
 Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
@@ -82,7 +82,7 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 
 - 2026-11-11 — F5 completa sin prototipo: formulario con Enter/Tab y Esc; confirmación explícita antes de enviar, asserts seleccionables desde respuesta real y guardado YAML sin sobrescribir. `httpi new [archivo] --name ...` requiere TTY; Authorization/Cookie se extraen a variables igual que al importar. Ctrl+C aborta curl. Verificación local: 406 tests y recorrido manual en TTY que guardó y ejecutó un test con éxito.
 
-- 2026-11-11 — CI F5.4: las pruebas de Ink leían callbacks tras una espera fija; se cambia a esperar la condición `toHaveBeenCalledOnce` sin subir timeouts, saltar tests ni relajar asserts. Verificación local: 411 tests; pendiente revalidación remota.
+- 2026-11-11 — CI F5.4: las pruebas de Ink leían callbacks tras una espera fija; se cambia a esperar la condición `toHaveBeenCalledOnce` sin subir timeouts, saltar tests ni relajar asserts. La espera de callbacks no bastó en CI; se usa además `act()` para vaciar los efectos pasivos antes de escribir teclas (la pantalla visible precede a la suscripción de entrada). Verificación local: 414 tests; pendiente revalidación remota.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.
