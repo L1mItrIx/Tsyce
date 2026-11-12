@@ -140,3 +140,17 @@ test('HEAD returns headers and an empty body without hanging', async () => {
   expect(result).toMatchObject({ status: 200, body: '', curlExitCode: 0, error: null });
   expect(result.headers['x-probe']).toEqual(['yes']);
 });
+
+test('an AbortSignal stops a running curl and cleans up its temporary files', async () => {
+  const abort = new AbortController();
+  const running = runRequest(curlBin, requestSchema.parse({ url: `${baseUrl}/slow` }), abort.signal);
+  setTimeout(() => abort.abort(), 100);
+  const result = await running;
+  expect(result.error).toBe('request cancelled');
+  expect(result.curlExitCode).not.toBe(0);
+});
+
+test('an already aborted signal does not start curl', async () => {
+  const result = await runRequest('no-such-curl', requestSchema.parse({ url: baseUrl }), AbortSignal.abort());
+  expect(result.error).toBe('request cancelled');
+});

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { text } from 'node:stream/consumers';
+import { existsSync } from 'node:fs';
 import { Command, InvalidArgumentError, Option } from 'commander';
 import { CurlExportError, exportCurl } from './core/exporter/curl.js';
 import {
@@ -16,7 +17,7 @@ import { ShellSyntaxError } from './core/importer/tokenize-bash.js';
 import { formatPretty } from './core/reporter/pretty.js';
 import { EXIT, type ExitCode, exitCodeFor, runTestFile } from './core/run.js';
 import { detectCurl } from './core/runner/detect.js';
-import { CurlUnavailableError } from './core/runner/exec.js';
+import { CurlUnavailableError, runRequest } from './core/runner/exec.js';
 import type { RequestSpec, TestFile } from './core/schema.js';
 import { resolveVars, UnresolvedVariableError } from './core/vars.js';
 
@@ -72,6 +73,23 @@ async function importCommand(curlFile: string | undefined, options: ImportOption
 }
 
 type ExportOptions = RunOptions & { dialect: Dialect };
+
+async function newCommand(path: string, options: { name?: string }): Promise<ExitCode> {
+  if (!process.stdin.isTTY || !process.stderr.isTTY) {
+    throw new TestFileError('httpi new requires an interactive terminal; use httpi import for piped input');
+  }
+  if (existsSync(path)) throw new TestFileError(`${path}: file already exists; choose a new destination`);
+  const curl = await detectCurl();
+  const { launchWizard } = await import('./tui/new-wizard.js');
+  const completed = await launchWizard((request, signal) => runRequest(curl.bin, request, signal));
+  if (completed === null) { say('httpi: cancelled; no file written'); return EXIT.ok; }
+  const { request, secrets } = extractSecrets(completed.request);
+  const file: TestFile = { version: 1, tests: [{ name: options.name ?? defaultTestName(request), request, expect: completed.expected }] };
+  await writeTestFile(path, file);
+  say(`httpi: wrote ${path}`);
+  for (const secret of secrets) say(`secret: ${secret.header} replaced by {{${secret.variable}}}; run with --var ${secret.variable}=...`);
+  return EXIT.ok;
+}
 
 async function exportCommand(path: string, options: ExportOptions): Promise<ExitCode> {
   const file = resolveVars(await readTestFile(path), {
@@ -137,5 +155,12 @@ program
   .option('--env <name>', 'environment from httpi.env.yaml')
   .option('--var <name=value>', 'set a variable; repeatable, wins over the environment', collectVar, {})
   .action((path: string, options: ExportOptions) => finish(exportCommand(path, options)));
+
+program
+  .command('new')
+  .description('create a test interactively: edit a request, send it once, select assertions and save YAML')
+  .argument('[file]', 'new YAML destination (never overwrites an existing file)', 'httpi.test.yaml')
+  .option('--name <name>', 'name of the generated test (default: method and path)')
+  .action((path: string, options: { name?: string }) => finish(newCommand(path, options)));
 
 await program.parseAsync();

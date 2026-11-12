@@ -38,7 +38,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 - [x] F5.1 Reducer puro del asistente (sin Ink) con tests; commit `F5.1: add pure request wizard reducer`
 - [x] F5.2 Pantallas Ink: método → URL → headers → body; commit `F5.2: add keyboard-driven Ink request editor`
 - [x] F5.3 Menú de asserts a partir de la respuesta real; commit `F5.3: suggest and select response assertions in Ink`
-- [ ] F5.4 `httpi new` escribe el YAML
+- [x] F5.4 `httpi new` escribe el YAML; commit `F5.4: create API tests with the interactive wizard`
 
 ## Fase 6 — Exportar
 - [x] F6.1 Exportar curl por dialecto (`curl.exe` en PowerShell); commit `F6.1: export curl scripts for Bash, cmd and PowerShell`
@@ -79,6 +79,8 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-11 — F6.1: comprobación local en Linux/Node 24: 381 tests, typecheck y build; ejecución real Bash/curl conserva URL, headers y body. Los e2e ejecutan también cmd y PowerShell en Windows dentro de la matriz CI; resultado remoto pendiente.
 
 - 2026-11-11 — El usuario autoriza completar F5 sin el prototipo y continuar el proyecto; nombre elegido para npm: `httpi-cli`. Se conserva la rama indicada.
+
+- 2026-11-11 — F5 completa sin prototipo: formulario con Enter/Tab y Esc; confirmación explícita antes de enviar, asserts seleccionables desde respuesta real y guardado YAML sin sobrescribir. `httpi new [archivo] --name ...` requiere TTY; Authorization/Cookie se extraen a variables igual que al importar. Ctrl+C aborta curl. Verificación local: 406 tests y recorrido manual en TTY que guardó y ejecutó un test con éxito.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.

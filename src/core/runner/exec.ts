@@ -11,17 +11,25 @@ export class CurlUnavailableError extends Error {
 
 export type SpawnOutput = { exitCode: number; stdout: string; stderr: string };
 
-export function spawnCollect(bin: string, args: string[]): Promise<SpawnOutput> {
+export function spawnCollect(bin: string, args: string[], signal?: AbortSignal): Promise<SpawnOutput> {
+  if (signal?.aborted) return Promise.resolve({ exitCode: -1, stdout: '', stderr: 'request cancelled' });
   return new Promise((resolve, reject) => {
     const child = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    const abort = () => { child.kill(); };
+    signal?.addEventListener('abort', abort, { once: true });
+    if (signal?.aborted) abort();
     let stdout = '';
     let stderr = '';
     child.stdout.setEncoding('utf8').on('data', (chunk: string) => (stdout += chunk));
     child.stderr.setEncoding('utf8').on('data', (chunk: string) => (stderr += chunk));
     child.on('error', (cause) => {
+      signal?.removeEventListener('abort', abort);
       reject(new CurlUnavailableError(`cannot run curl binary "${bin}": ${cause.message}`, { cause }));
     });
-    child.on('close', (code) => resolve({ exitCode: code ?? -1, stdout, stderr }));
+    child.on('close', (code) => {
+      signal?.removeEventListener('abort', abort);
+      resolve({ exitCode: code ?? -1, stdout, stderr });
+    });
   });
 }
 
@@ -63,13 +71,13 @@ function describeFailure(exitCode: number, errormsg: string | null | undefined, 
   return errormsg || fromStderr || `curl exited with code ${exitCode}`;
 }
 
-export async function runRequest(curlBin: string, request: RequestSpec): Promise<RunResult> {
+export async function runRequest(curlBin: string, request: RequestSpec, signal?: AbortSignal): Promise<RunResult> {
   const dir = await mkdtemp(join(tmpdir(), 'httpi-'));
   try {
     const bodyFile = join(dir, 'body');
     // -q must come first: it keeps the user's ~/.curlrc from changing the request.
     const args = ['-q', '-sS', '-o', bodyFile, '-w', WRITE_OUT, ...buildCurlArgs(request)];
-    const { exitCode, stdout, stderr } = await spawnCollect(curlBin, args);
+    const { exitCode, stdout, stderr } = await spawnCollect(curlBin, args, signal);
     const out = parseWriteOut(stdout);
     // With --head curl writes the response headers to -o; a HEAD response has no body.
     const body = request.method === 'HEAD' ? '' : await readFile(bodyFile, 'utf8').catch(() => '');
@@ -79,7 +87,7 @@ export async function runRequest(curlBin: string, request: RequestSpec): Promise
       headers: out?.headers ?? {},
       body,
       curlExitCode: exitCode,
-      error: exitCode === 0 ? null : describeFailure(exitCode, out?.meta.errormsg, stderr),
+      error: signal?.aborted ? 'request cancelled' : exitCode === 0 ? null : describeFailure(exitCode, out?.meta.errormsg, stderr),
     };
   } finally {
     await rm(dir, { recursive: true, force: true });
