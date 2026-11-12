@@ -26,6 +26,7 @@ import { EXIT, type ExitCode, exitCodeFor, type RunItem, runTestFiles, validateR
 import { detectCurl } from './core/runner/detect.js';
 import { CurlUnavailableError, runRequest } from './core/runner/exec.js';
 import type { TestFile } from './core/schema.js';
+import { validateProject } from './core/validate.js';
 import { resolveVars, UnresolvedVariableError } from './core/vars.js';
 
 const say = (line: string) => process.stderr.write(`${line}\n`);
@@ -100,11 +101,24 @@ async function runProjectCommand(projectPath: string, options: RunOptions): Prom
 async function runCommand(path: string | undefined, options: RunOptions): Promise<ExitCode> {
   checkRunOptions(options);
   if (path !== undefined && basename(path) !== PROJECT_FILE_NAME) return runFileCommand(path, options);
+  return runProjectCommand(requireProject(path), options);
+}
+
+function requireProject(path: string | undefined): string {
   const projectPath = path ?? findProjectFile(process.cwd());
   if (projectPath === null) {
     throw new TestFileError(`no ${PROJECT_FILE_NAME} found in this directory or its parents; pass a test file: httpi run <file>`);
   }
-  return runProjectCommand(resolve(projectPath), options);
+  return resolve(projectPath);
+}
+
+async function validateCommand(options: VariableOptions): Promise<ExitCode> {
+  const projectPath = requireProject(undefined);
+  const { problems, files, tests } = await validateProject(projectPath, { cli: options.var, system: process.env, ...(options.env !== undefined && { env: options.env }) });
+  for (const problem of problems) process.stdout.write(`${problem.file}: ${problem.message}\n`);
+  const size = `${files} ${files === 1 ? 'file' : 'files'}, ${tests} ${tests === 1 ? 'test' : 'tests'}`;
+  process.stdout.write(problems.length === 0 ? `valid: ${size}; no requests were sent\n` : `${problems.length} ${problems.length === 1 ? 'problem' : 'problems'} in ${size}\n`);
+  return problems.length === 0 ? EXIT.ok : EXIT.invalid;
 }
 
 async function initCommand(directory: string): Promise<ExitCode> {
@@ -229,6 +243,13 @@ program
   .description('lay out a project: httpi.yaml, tests/, data/, a CI workflow and .gitignore entries (never replaces files)')
   .argument('[directory]', 'where to create the project', '.')
   .action((directory: string) => finish(initCommand(directory)));
+
+program
+  .command('validate')
+  .description('check every file of the project without sending requests; exit 0 = valid, 2 = problems found')
+  .option('--env <name>', 'environment to validate against (default: env.default)')
+  .option('--var <name=value>', 'set a variable; repeatable', collectVar, {})
+  .action((options: VariableOptions) => finish(validateCommand(options)));
 
 program
   .command('import')

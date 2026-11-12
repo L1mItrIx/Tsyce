@@ -44,24 +44,37 @@ export function prepareWizardFile(tests: TestCase[], name?: string): { file: Tes
   return { file: { version: 1, ...(name !== undefined && tests.length > 1 ? { name } : {}), tests: prepared }, secrets };
 }
 
-/** Makes one curl --form expression point at files relative to `baseDir` instead of the current directory. */
-function resolveFormField(field: string, baseDir: string): string {
+type FormFile = { prefix: string; paths: string[]; options: string };
+
+/** Splits a curl --form expression that refers to files (`name=@a,b;type=x`, `name=<a`); null for a plain value. */
+function parseFormFile(field: string, baseDir: string): FormFile | null {
   const equals = field.indexOf('=');
   const marker = field[equals + 1];
-  if (equals === -1 || (marker !== '@' && marker !== '<')) return field; // a plain value, not a file
+  if (equals === -1 || (marker !== '@' && marker !== '<')) return null;
   const rest = field.slice(equals + 2);
   // The file name ends at ";type=..." / ";filename=..."; "@a,b" uploads several files.
   const semicolon = rest.indexOf(';');
   const names = semicolon === -1 ? rest : rest.slice(0, semicolon);
-  const options = semicolon === -1 ? '' : rest.slice(semicolon);
   const paths = names.split(',').map((name) => (name === '-' || name === '' || isAbsolute(name) ? name : resolve(baseDir, name)));
-  return `${field.slice(0, equals + 2)}${paths.join(',')}${options}`;
+  return { prefix: field.slice(0, equals + 2), paths, options: semicolon === -1 ? '' : rest.slice(semicolon) };
 }
+
+const formFiles = (request: RequestSpec, baseDir: string): Array<FormFile | null> =>
+  request.body !== undefined && 'form' in request.body ? request.body.form.map((field) => parseFormFile(field, baseDir)) : [];
 
 /** Multipart file references (`name=@path`, `name=<path`) resolved against the directory of the file that declares them. */
 export function resolveFormPaths(request: RequestSpec, baseDir: string): RequestSpec {
   if (request.body === undefined || !('form' in request.body)) return request;
-  return { ...request, body: { form: request.body.form.map((field) => resolveFormField(field, baseDir)) } };
+  const files = formFiles(request, baseDir);
+  return { ...request, body: { form: request.body.form.map((field, index) => {
+    const file = files[index];
+    return file ? `${file.prefix}${file.paths.join(',')}${file.options}` : field;
+  }) } };
+}
+
+/** The files a multipart body reads from disk, as absolute paths (stdin and empty names excluded). */
+export function formFilePaths(request: RequestSpec, baseDir: string): string[] {
+  return formFiles(request, baseDir).flatMap((file) => file?.paths ?? []).filter((path) => path !== '-' && path !== '');
 }
 
 /** Parses YAML (JSON is valid YAML) against a schema; `kind` names the document in errors. */

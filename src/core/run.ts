@@ -4,7 +4,7 @@ import type { DataRow } from './data.js';
 import { resolveFormPaths } from './file.js';
 import type { TestFile } from './schema.js';
 import { captureAuthToken, captureValue, maskSecrets } from './capture.js';
-import { resolveVars, type VarSources } from './vars.js';
+import { resolveVars, UnresolvedVariableError, type VarSources } from './vars.js';
 
 export const EXIT = {
   /** Every test passed. */
@@ -91,11 +91,19 @@ export function validateRunVariables(input: TestFile | Array<TestFile | RunItem>
   const items = toItems(input);
   const names = captureNames(items);
   const available = new Set<string>();
+  const unresolved = new Set<string>();
   for (const run of items.flatMap(testRuns)) {
     const runtime = Object.fromEntries(names.map((name) => [name, available.has(name) ? '[captured]' : undefined]));
-    resolvedTest(run, sources, names.length > 0 ? runtime : sources.runtime);
+    try {
+      resolvedTest(run, sources, names.length > 0 ? runtime : sources.runtime);
+    } catch (error) {
+      if (!(error instanceof UnresolvedVariableError)) throw error;
+      for (const reference of error.references) unresolved.add(reference);
+    }
     for (const name of Object.keys(run.template.capture ?? {})) available.add(name);
   }
+  // One error for the whole run, so every missing value can be fixed in one go.
+  if (unresolved.size > 0) throw new UnresolvedVariableError([...unresolved]);
 }
 
 /**
