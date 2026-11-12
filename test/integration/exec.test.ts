@@ -1,8 +1,9 @@
-import { readdirSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
-import { afterAll, beforeAll, expect, test } from 'vitest';
+import { join } from 'node:path';
+import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { detectCurl } from '../../src/core/runner/detect.js';
 import { runRequest } from '../../src/core/runner/exec.js';
 import { requestSchema } from '../../src/core/schema.js';
@@ -61,10 +62,8 @@ afterAll(async () => {
 });
 
 const run = (input: Record<string, unknown>) => runRequest(curlBin, requestSchema.parse(input));
-const httpiTempDirs = () => readdirSync(tmpdir()).filter((name) => name.startsWith('httpi-'));
 
 test('200 with JSON: status, headers, body and timing come back', async () => {
-  const before = httpiTempDirs();
   const result = await run({
     method: 'POST',
     url: `${baseUrl}/echo`,
@@ -84,7 +83,20 @@ test('200 with JSON: status, headers, body and timing come back', async () => {
     trace: 'abc 123',
     body: '{"name":"Ana","tags":["a","it\'s"]}',
   });
-  expect(httpiTempDirs()).toEqual(before);
+});
+
+test('temporary files are removed, also when curl fails', async () => {
+  const privateTmp = mkdtempSync(join(tmpdir(), 'runner-tmp-check-'));
+  for (const name of ['TMPDIR', 'TEMP', 'TMP']) vi.stubEnv(name, privateTmp);
+  try {
+    expect(tmpdir()).toBe(privateTmp);
+    await run({ url: `${baseUrl}/echo` });
+    await run({ url: 'http://127.0.0.1:1/' });
+    expect(readdirSync(privateTmp)).toEqual([]);
+  } finally {
+    vi.unstubAllEnvs();
+    rmSync(privateTmp, { recursive: true, force: true });
+  }
 });
 
 test('404 is a response, not a curl error', async () => {
