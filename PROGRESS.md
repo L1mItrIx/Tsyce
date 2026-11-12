@@ -26,7 +26,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 - [x] F3.2 `httpi.env.yaml`, `--env`, `--var`; variable sin resolver → salida 2
 
 ## Fase 4 — Importador de curl
-- [ ] F4.1 `tokenize-bash.ts`
+- [x] F4.1 `tokenize-bash.ts`
 - [ ] F4.2 `tokenize-cmd.ts`
 - [ ] F4.3 `tokenize-powershell.ts`
 - [ ] F4.4 `detect-dialect.ts` y `--dialect`
@@ -66,6 +66,7 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-12 — F2.4: `check` ahora es typecheck → build → tests, porque los e2e ejecutan `dist/cli.js`. Los errores de uso de commander salen con 2 (no 1). `httpi run` recibe un solo archivo; el reporte va a stdout y los errores a stderr; color solo en TTY y sin `NO_COLOR`.
 - 2026-11-12 — F3.1: `{{nombre}}` busca en `--var`, luego en el entorno del sistema y luego en `httpi.env.yaml`; `${NOMBRE}` solo lee el entorno del sistema. Se sustituye en cualquier valor de texto del test (también en `expect`), nunca en claves; los valores no se vuelven a expandir.
 - 2026-11-12 — F3.2: `httpi.env.yaml` se busca junto al archivo de test y, si no está, en el directorio actual; solo se lee si se pasa `--env`. `--var` es repetible y se parte en el primer `=`. Entorno inexistente, `--var` mal formado y variable sin resolver salen con 2.
+- 2026-11-12 — F4.1: los tokenizadores no expanden `$VAR` ni sustituciones: quedan como texto. Comilla sin cerrar lanza `ShellSyntaxError` (definido en `tokenize-bash.ts`, lo reutilizan los otros dialectos). La tabla de Bash se contrastó a mano contra `bash` real (15 entradas, 0 diferencias).
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.
@@ -75,8 +76,10 @@ Ideas que surgieron y no se hicieron. No implementar sin aprobación.
 - `httpi run` con varios archivos o un directorio.
 - `httpi --version`.
 - Escape para escribir `{{` o `${` literales en un test.
+- Al importar, convertir `$VAR` de Bash en `${VAR}` de httpi.
 
 ## Bloqueos
 Qué impide avanzar y qué se necesita del usuario.
 
 - El prototipo en Ink del usuario no está en el repo (afecta F5.2).
+- Los fixtures de `test/fixtures/curl/` están escritos a mano con el formato de DevTools, no copiados de un navegador real. Hace falta que el usuario pegue curls reales ("Copy as cURL (bash)" y "(cmd)") para validar el riesgo de comillas de PLAN §11.
