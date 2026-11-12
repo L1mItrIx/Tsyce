@@ -233,6 +233,35 @@ test.each<[name: string, setup: () => Promise<void>, args: string[], stderr: Reg
   expect(result.code).toBe(2);
 });
 
+test('httpi.local.yaml wins over the environment of httpi.yaml and loses to the system and --var', async () => {
+  await write('httpi.yaml', {
+    version: 1,
+    env: { default: 'local', environments: { local: { baseUrl: 'http://127.0.0.1:1', who: 'shared' } } },
+    run: ['tests/who.yaml'],
+  });
+  await write('tests/who.yaml', { version: 1, tests: [{ name: 'as {{who}}', request: { url: '{{baseUrl}}/health' }, expect: { status: 200 } }] });
+  await write('httpi.local.yaml', `baseUrl: ${baseUrl}\nwho: personal\n`);
+
+  const local = await httpi(['run'], { cwd: root, env: { who: undefined, baseUrl: undefined } });
+  expect(local.stdout).toContain('✓ as personal (200,');
+  expect(local.code).toBe(0);
+
+  const system = await httpi(['run'], { cwd: root, env: { who: 'system', baseUrl: undefined } });
+  expect(system.stdout).toContain('✓ as system (200,');
+
+  const cli = await httpi(['run', '--var', 'who=flag'], { cwd: root, env: { who: 'system', baseUrl: undefined } });
+  expect(cli.stdout).toContain('✓ as flag (200,');
+});
+
+test('exit 2 for an invalid httpi.local.yaml', async () => {
+  await project();
+  await write('httpi.local.yaml', 'dev:\n  token: abc\n');
+  const result = await httpi(['run'], { cwd: root });
+  expect(result.stderr).toMatch(/httpi\.local\.yaml: invalid local values file/);
+  expect(calls).toEqual([]);
+  expect(result.code).toBe(2);
+});
+
 test('httpi.env.yaml next to a project that declares env is ignored with a warning', async () => {
   await project();
   await write('httpi.env.yaml', 'local: { baseUrl: "http://127.0.0.1:1" }\n');

@@ -2,9 +2,10 @@ import { existsSync } from 'node:fs';
 import { glob } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { ENV_FILE_NAME, parseWith, readEnvironment, readTextFile, TestFileError } from './file.js';
-import { type ProjectFile, projectFileSchema } from './schema.js';
+import { localFileSchema, type ProjectFile, projectFileSchema } from './schema.js';
 
 export const PROJECT_FILE_NAME = 'httpi.yaml';
+export const LOCAL_FILE_NAME = 'httpi.local.yaml';
 
 /** The closest httpi.yaml, looking in `startDir` and then in each parent directory. */
 export function findProjectFile(startDir: string): string | null {
@@ -74,4 +75,12 @@ export async function projectEnvironment(
     throw new TestFileError(`${projectPath}: no environment "${name}"; available: ${available}`);
   }
   return { variables, warnings };
+}
+
+/** Personal values from httpi.local.yaml next to the project file; none when the file does not exist. */
+export async function readLocalValues(projectPath: string): Promise<Record<string, string>> {
+  const path = join(dirname(resolve(projectPath)), LOCAL_FILE_NAME);
+  if (!existsSync(path)) return {};
+  // An empty file is a valid YAML document without content.
+  return parseWith(localFileSchema.nullable(), await readTextFile(path), path, 'local values file') ?? {};
 }

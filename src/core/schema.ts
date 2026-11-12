@@ -107,6 +107,9 @@ export const envFileSchema = z.record(
 
 export type EnvFile = z.infer<typeof envFileSchema>;
 
+/** httpi.local.yaml: personal values and secrets kept out of git, as `name: value`. */
+export const localFileSchema = z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]).transform(String));
+
 const projectPath = z.string().min(1);
 
 /** One entry of `run:` — a test file, or a pattern such as `tests/admin/*.yaml`. */

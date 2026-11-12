@@ -1,10 +1,12 @@
-/** User values come from cli, system, file; reserved runtime captures take precedence. */
+/** User values come from cli, system, local, file, in that order; reserved runtime captures take precedence. */
 export type VarSources = {
   /** `--var name=value` */
   cli: Record<string, string>;
   /** System environment; the only source for `${NAME}`. */
   system: Record<string, string | undefined>;
-  /** The selected environment of httpi.env.yaml. */
+  /** httpi.local.yaml: personal values, below the system and above the shared environment. */
+  local?: Record<string, string>;
+  /** The selected environment of httpi.yaml or httpi.env.yaml. */
   file: Record<string, string>;
   /** Captured values reserved by the current flow; undefined prevents stale fallback. */
   runtime?: Record<string, string | undefined>;
@@ -17,7 +19,7 @@ const DATA_PREFIX = 'data.';
 function lookup(name: string, sources: VarSources): string | undefined {
   if (name.startsWith(DATA_PREFIX)) return sources.data?.[name.slice(DATA_PREFIX.length)];
   if (sources.runtime && Object.hasOwn(sources.runtime, name)) return sources.runtime[name];
-  return sources.cli[name] ?? sources.system[name] ?? sources.file[name];
+  return sources.cli[name] ?? sources.system[name] ?? sources.local?.[name] ?? sources.file[name];
 }
 
 export class UnresolvedVariableError extends Error {

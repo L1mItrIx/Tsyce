@@ -18,7 +18,7 @@ import {
 import { type Dialect, DIALECTS, tokenizeCurl } from './core/importer/detect-dialect.js';
 import { CurlImportError, extractSecrets, mapFlags } from './core/importer/map-flags.js';
 import { ShellSyntaxError } from './core/importer/tokenize-bash.js';
-import { expandRun, findProjectFile, PROJECT_FILE_NAME, projectEnvironment, readProjectFile } from './core/project.js';
+import { expandRun, findProjectFile, PROJECT_FILE_NAME, projectEnvironment, readLocalValues, readProjectFile } from './core/project.js';
 import { formatPretty, formatPrettyProject } from './core/reporter/pretty.js';
 import { formatJUnit, formatJUnitSuites } from './core/reporter/junit.js';
 import { readDataFile, readTestRows } from './core/data.js';
@@ -66,7 +66,7 @@ async function runProjectCommand(projectPath: string, options: RunOptions): Prom
   const project = await readProjectFile(projectPath);
   const environment = await projectEnvironment(project, projectPath, options.env);
   for (const warning of environment.warnings) say(`warning: ${warning}`);
-  const sources = { cli: options.var, system: process.env, file: environment.variables };
+  const sources = { cli: options.var, system: process.env, local: await readLocalValues(projectPath), file: environment.variables };
 
   // One item per file, or one per row when the run entry repeats the file over a data file.
   const items: Array<RunItem & { title: string }> = [];

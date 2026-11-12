@@ -71,6 +71,14 @@ describe('precedence', () => {
     expect(resolveVars('{{v}}', { ...all, cli: {}, system: {} })).toBe('file');
   });
 
+  test('local values sit between the system environment and the env file', () => {
+    const withLocal = { ...all, local: { v: 'local' } };
+    expect(resolveVars('{{v}}', withLocal)).toBe('cli');
+    expect(resolveVars('{{v}}', { ...withLocal, cli: {} })).toBe('system');
+    expect(resolveVars('{{v}}', { ...withLocal, cli: {}, system: {} })).toBe('local');
+    expect(() => resolveVars('${v}', { ...withLocal, system: {} })).toThrow(UnresolvedVariableError);
+  });
+
   test('${NAME} only reads the system environment', () => {
     expect(resolveVars('${v}', all)).toBe('system');
     expect(() => resolveVars('${v}', { ...all, system: {} })).toThrow(UnresolvedVariableError);

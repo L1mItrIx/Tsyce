@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { TestFileError } from '../../src/core/file.js';
-import { expandRun, findProjectFile, projectEnvironment, readProjectFile } from '../../src/core/project.js';
+import { expandRun, findProjectFile, projectEnvironment, readLocalValues, readProjectFile } from '../../src/core/project.js';
 import { projectFileSchema } from '../../src/core/schema.js';
 
 let root: string;
@@ -143,6 +143,28 @@ describe('projectEnvironment', () => {
       });
     } finally {
       await rm(join(envDir(), 'httpi.env.yaml'));
+    }
+  });
+});
+
+describe('readLocalValues', () => {
+  const dir = () => join(root, 'tests', 'admin');
+  const local = () => join(dir(), 'httpi.local.yaml');
+
+  test('no file means no values', async () => {
+    expect(await readLocalValues(join(dir(), 'httpi.yaml'))).toEqual({});
+  });
+
+  test('reads name: value pairs as text; an empty file is fine; anything else is an error', async () => {
+    try {
+      await writeFile(local(), 'token: abc\nretries: 3\ndebug: true\n');
+      expect(await readLocalValues(join(dir(), 'httpi.yaml'))).toEqual({ token: 'abc', retries: '3', debug: 'true' });
+      await writeFile(local(), '# nothing yet\n');
+      expect(await readLocalValues(join(dir(), 'httpi.yaml'))).toEqual({});
+      await writeFile(local(), 'dev:\n  token: abc\n');
+      await expect(readLocalValues(join(dir(), 'httpi.yaml'))).rejects.toThrow(/httpi\.local\.yaml: invalid local values file/);
+    } finally {
+      await rm(local(), { force: true });
     }
   });
 });
