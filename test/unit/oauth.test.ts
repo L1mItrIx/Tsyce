@@ -43,6 +43,27 @@ describe('tokenRequest', () => {
   });
 });
 
+describe('refresh_token', () => {
+  const refresh = { type: 'oauth2', flow: 'refresh_token', tokenUrl: 'https://id.example/token', clientId: 'cli', refreshToken: 'r/t+1' };
+
+  test('a confidential client authenticates with Basic and sends the refresh token in the form', () => {
+    const request = tokenRequest(authSchema.parse({ ...refresh, clientSecret: 'shh', scopes: ['a'] }));
+    expect(request.headers).toEqual({ Accept: 'application/json', Authorization: `Basic ${Buffer.from('cli:shh').toString('base64')}` });
+    expect(request.body).toEqual({ text: 'grant_type=refresh_token&refresh_token=r%2Ft%2B1&scope=a' });
+  });
+
+  test('a public client has no secret: only its id goes in the body', () => {
+    const request = tokenRequest(authSchema.parse(refresh));
+    expect(request.headers).toEqual({ Accept: 'application/json' });
+    expect(request.body).toEqual({ text: 'grant_type=refresh_token&refresh_token=r%2Ft%2B1&client_id=cli' });
+  });
+
+  test('the refresh token is required', () => {
+    expect(authSchema.safeParse({ ...refresh, refreshToken: undefined }).success).toBe(false);
+    expect(authSchema.safeParse({ ...refresh, refreshToken: '' }).success).toBe(false);
+  });
+});
+
 describe('readTokenResponse', () => {
   test.each([
     ['a plain token', '{"access_token":"abc.def","token_type":"Bearer","expires_in":3600}'],

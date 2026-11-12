@@ -39,8 +39,10 @@ const form = (fields: Record<string, string | undefined>) =>
 
 /** The request to the token endpoint for one auth block whose variables are already resolved. */
 export function tokenRequest(config: AuthConfig): RequestSpec {
-  const inBody = config.clientAuth === 'body';
-  const basic = Buffer.from(`${encodeURIComponent(config.clientId)}:${encodeURIComponent(config.clientSecret)}`).toString('base64');
+  const secret = config.clientSecret;
+  // A public client (no secret) can only name itself in the body.
+  const inBody = config.clientAuth === 'body' || secret === undefined;
+  const basic = Buffer.from(`${encodeURIComponent(config.clientId)}:${encodeURIComponent(secret ?? '')}`).toString('base64');
   return {
     method: 'POST',
     url: config.tokenUrl,
@@ -48,8 +50,9 @@ export function tokenRequest(config: AuthConfig): RequestSpec {
     body: {
       text: form({
         grant_type: config.flow,
+        ...(config.flow === 'refresh_token' && { refresh_token: config.refreshToken }),
         scope: config.scopes?.join(' '),
-        ...(inBody && { client_id: config.clientId, client_secret: config.clientSecret }),
+        ...(inBody && { client_id: config.clientId, client_secret: secret }),
       }),
     },
     timeoutMs: 30_000,

@@ -29,7 +29,9 @@ beforeAll(async () => {
         tokenRequests.push({ authorization: req.headers.authorization, body });
         const params = new URLSearchParams(body);
         const viaBody = params.get('client_id') === 'ci-client' && params.get('client_secret') === 'CI_CLIENT_SECRET';
-        if (tokenStatus !== 200 || (req.headers.authorization !== BASIC && !viaBody)) {
+        const publicRefresh = params.get('client_id') === 'ci-client' && params.get('client_secret') === null && params.get('grant_type') === 'refresh_token';
+        const badRefresh = params.get('grant_type') === 'refresh_token' && params.get('refresh_token') !== 'USER_REFRESH_TOKEN';
+        if (tokenStatus !== 200 || badRefresh || (req.headers.authorization !== BASIC && !viaBody && !publicRefresh)) {
           res.writeHead(tokenStatus === 200 ? 401 : tokenStatus);
           res.end('{"error":"invalid_client","error_description":"Client authentication failed"}');
           return;
@@ -102,6 +104,34 @@ test('clientAuth: body sends the client credentials in the form', async () => {
   const run = await httpi(['run'], { cwd: root, env });
   expect(tokenRequests).toEqual([{ authorization: undefined, body: 'grant_type=client_credentials&client_id=ci-client&client_secret=CI_CLIENT_SECRET' }]);
   expect(run.code).toBe(0);
+});
+
+test.each<[name: string, auth: object, request: { authorization: string | undefined; body: string }]>([
+  [
+    'a confidential client',
+    { flow: 'refresh_token', refreshToken: '${REFRESH_TOKEN}' },
+    { authorization: BASIC, body: 'grant_type=refresh_token&refresh_token=USER_REFRESH_TOKEN&scope=users.read' },
+  ],
+  [
+    'a public client',
+    { flow: 'refresh_token', refreshToken: '${REFRESH_TOKEN}', clientSecret: undefined, scopes: undefined },
+    { authorization: undefined, body: 'grant_type=refresh_token&refresh_token=USER_REFRESH_TOKEN&client_id=ci-client' },
+  ],
+])('refresh_token: %s exchanges the refresh token once and never prints it', async (_name, auth, request) => {
+  await project(auth);
+  const run = await httpi(['run', '--show-response'], { cwd: root, env: { ...env, REFRESH_TOKEN: 'USER_REFRESH_TOKEN' } });
+  expect(tokenRequests).toEqual([request]);
+  expect(calls).toEqual(['POST /oauth/token', 'GET /users', 'GET /users/7', 'GET /public']);
+  expect(run.stdout + run.stderr).not.toMatch(/OAUTH_TOKEN_|USER_REFRESH_TOKEN|CI_CLIENT_SECRET/);
+  expect(run.code).toBe(0);
+});
+
+test('refresh_token: an expired refresh token stops the run with exit 3', async () => {
+  await project({ flow: 'refresh_token', refreshToken: '${REFRESH_TOKEN}' });
+  const run = await httpi(['run'], { cwd: root, env: { ...env, REFRESH_TOKEN: 'EXPIRED_REFRESH_TOKEN' } });
+  expect(run.stderr).toBe('httpi: auth "main": the token endpoint answered 401 (invalid_client: Client authentication failed)\n');
+  expect(run.stderr).not.toContain('EXPIRED_REFRESH_TOKEN');
+  expect(run.code).toBe(3);
 });
 
 test('no token is requested when no test uses auth', async () => {

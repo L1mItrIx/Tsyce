@@ -126,6 +126,14 @@ const oauthCommon = {
 /** How to obtain an access token. Secrets belong in `${ENV}` references, never in the file. */
 export const authSchema = z.discriminatedUnion('flow', [
   z.strictObject({ ...oauthCommon, flow: z.literal('client_credentials'), clientSecret: z.string().min(1) }),
+  // For CI on behalf of a user: a long-lived refresh token is exchanged at the start of each run.
+  z.strictObject({
+    ...oauthCommon,
+    flow: z.literal('refresh_token'),
+    refreshToken: z.string().min(1),
+    /** Omit for public clients, which identify themselves with the client id alone. */
+    clientSecret: z.string().min(1).optional(),
+  }),
 ]);
 
 export type AuthConfig = z.infer<typeof authSchema>;
