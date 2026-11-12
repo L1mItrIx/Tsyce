@@ -37,7 +37,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 ## Fase 5 — Modo guiado
 - [x] F5.1 Reducer puro del asistente (sin Ink) con tests; commit `F5.1: add pure request wizard reducer`
 - [x] F5.2 Pantallas Ink: método → URL → headers → body; commit `F5.2: add keyboard-driven Ink request editor`
-- [ ] F5.3 Menú de asserts a partir de la respuesta real
+- [x] F5.3 Menú de asserts a partir de la respuesta real; commit `F5.3: suggest and select response assertions in Ink`
 - [ ] F5.4 `httpi new` escribe el YAML
 
 ## Fase 6 — Exportar
