@@ -45,7 +45,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 - [ ] F6.2 (Opcional) Exportar a `fetch`
 
 ## Fase 7 — CI y publicación
-- [ ] F7.1 Reporter JUnit
+- [x] F7.1 Reporter JUnit; commit `F7.1: add JUnit XML output for CI`
 - [ ] F7.2 README con ejemplo de GitHub Actions
 - [ ] F7.3 Publicar `httpi.schema.json`
 - [ ] F7.4 Decidir nombre en npm (pendiente del usuario) y `npm publish`

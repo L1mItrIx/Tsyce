@@ -15,6 +15,7 @@ import { type Dialect, DIALECTS, tokenizeCurl } from './core/importer/detect-dia
 import { CurlImportError, extractSecrets, mapFlags } from './core/importer/map-flags.js';
 import { ShellSyntaxError } from './core/importer/tokenize-bash.js';
 import { formatPretty } from './core/reporter/pretty.js';
+import { formatJUnit } from './core/reporter/junit.js';
 import { EXIT, type ExitCode, exitCodeFor, runTestFile } from './core/run.js';
 import { detectCurl } from './core/runner/detect.js';
 import { CurlUnavailableError, runRequest } from './core/runner/exec.js';
@@ -23,7 +24,8 @@ import { resolveVars, UnresolvedVariableError } from './core/vars.js';
 
 const say = (line: string) => process.stderr.write(`${line}\n`);
 
-type RunOptions = { env?: string; var: Record<string, string> };
+type VariableOptions = { env?: string; var: Record<string, string> };
+type RunOptions = VariableOptions & { reporter: 'pretty' | 'junit' };
 
 async function runCommand(path: string, options: RunOptions): Promise<ExitCode> {
   const file = resolveVars(await readTestFile(path), {
@@ -34,7 +36,8 @@ async function runCommand(path: string, options: RunOptions): Promise<ExitCode> 
   const curl = await detectCurl();
   const outcomes = await runTestFile(file, curl.bin);
   const color = process.stdout.isTTY === true && !process.env.NO_COLOR;
-  process.stdout.write(`${formatPretty(file.name, outcomes, { color })}\n`);
+  const report = options.reporter === 'junit' ? formatJUnit(file.name, outcomes) : formatPretty(file.name, outcomes, { color });
+  process.stdout.write(`${report}\n`);
   return exitCodeFor(outcomes);
 }
 
@@ -72,7 +75,7 @@ async function importCommand(curlFile: string | undefined, options: ImportOption
   return EXIT.ok;
 }
 
-type ExportOptions = RunOptions & { dialect: Dialect };
+type ExportOptions = VariableOptions & { dialect: Dialect };
 
 async function newCommand(path: string, options: { name?: string }): Promise<ExitCode> {
   if (!process.stdin.isTTY || !process.stderr.isTTY) {
@@ -133,6 +136,7 @@ program
   .command('run')
   .description('run the tests in a file; exit 0 = pass, 1 = assert failed, 2 = invalid file or usage, 3 = curl or network error')
   .argument('<file>', 'test file (YAML or JSON)')
+  .addOption(new Option('--reporter <format>', 'output format').choices(['pretty', 'junit']).default('pretty'))
   .option('--env <name>', 'environment from httpi.env.yaml')
   .option('--var <name=value>', 'set a variable; repeatable, wins over the environment', collectVar, {})
   .action((path: string, options: RunOptions) => finish(runCommand(path, options)));
