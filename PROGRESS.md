@@ -7,7 +7,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 ## Fase 0 — Base
 - [x] F0.1 Repo: `package.json` (ESM, Node >= 22), TS estricto, vitest, script `check`
 - [~] F0.2 CI: GitHub Actions, matriz ubuntu/macos/windows × Node 22/24 — rama `claude/bold-albattani-fsyz04`; falta confirmar la matriz en verde
-- [ ] F0.3 Prueba de humo: Ink 8 + ink-testing-library renderizan y leen `lastFrame()`
+- [x] F0.3 Prueba de humo: Ink 8 + ink-testing-library renderizan y leen `lastFrame()`
 
 ## Fase 1 — Runner
 - [ ] F1.1 `runner/detect.ts`: binario de curl y versión mínima 7.83.0
@@ -56,6 +56,7 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-12 — Node >= 22; parser de curl propio para Bash + cmd + PowerShell; nombre npm pendiente.
 - 2026-11-12 — F0.1: `"private": true` hasta decidir el nombre en npm (evita un publish accidental); `tsconfig.json` revisa `src` + `test` sin emitir y `tsconfig.build.json` emite solo `src` a `dist`; `src/cli.ts` es un stub (sale 2) hasta F2.4.
 - 2026-11-12 — La fase 0 se trabaja en la rama `claude/bold-albattani-fsyz04` (asignada por la sesión) en vez de `fase-0-<slug>`.
+- 2026-11-12 — F0.3: `ink-testing-library` 4.0.0 funciona con Ink 8.0.0 + React 19.3 (`render`, `lastFrame()`, `stdin.write()`); el riesgo de PLAN §11 queda descartado, no hace falta el plan B.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.
