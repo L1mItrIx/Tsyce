@@ -1,6 +1,6 @@
 # Progreso de httpi
 
-Estado de las tareas de `PLAN.md` §10. El detalle de cada fase está allí; aquí solo va el estado.
+Estado de las tareas de `PLAN.md` §10 (MVP) y §15 (v0.2). El detalle de cada fase está allí; aquí solo va el estado.
 
 Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit).
 
@@ -61,6 +61,55 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 - [x] U5 Capturar el token desde el asistente y reutilizarlo en vivo y al repetir el archivo; commit `U5: capture authentication tokens in the interactive flow`.
 - [x] U6 Servidor MCP local para agentes y comparativa de alternativas; commit `U6: expose API test flows through local MCP tools`.
 
+## v0.2 — Proyecto en un solo YAML (`PLAN.md` §15)
+
+### V0 — Preparación
+- [x] V0.1 Plan v0.2 en `PLAN.md` §15, alcance en `CLAUDE.md` y fases en este archivo
+- [ ] V0.2 Integrar `claude/bold-albattani-fsyz04` a `main` (pull request; pendiente de que el usuario lo pida)
+
+### V1 — Proyecto
+- [ ] V1.1 `projectFileSchema` y `project.ts`: localizar y leer `httpi.yaml`, expandir `run:` (rutas y patrones)
+- [ ] V1.2 `httpi run` sin argumentos: ejecuta el proyecto, entornos en `httpi.yaml` (`env.default`), estado compartido entre archivos
+- [ ] V1.3 `report.junit` y `schema/httpi.project.schema.json` publicado
+
+### V2 — Capturas generales
+- [ ] V2.1 `capture` como mapa `{ nombre: jsonpath }` (`authToken` conserva su comportamiento)
+- [ ] V2.2 Variables capturadas compartidas entre archivos y validación previa de referencias
+
+### V3 — Datos
+- [ ] V3.1 `data.ts`: parser CSV (RFC 4180) y lector JSON → filas
+- [ ] V3.2 `data` en un test y en `run:`, `{{data.columna}}`, resultados `nombre [fila N]` en los reporters
+
+### V4 — Colaboración por git
+- [ ] V4.1 Rutas de `body.form` (`@ruta`) y de `data` relativas al YAML que las declara
+- [ ] V4.2 `httpi.local.yaml` y su precedencia
+- [ ] V4.3 `httpi init`
+- [ ] V4.4 `httpi validate`
+
+### V5 — OAuth 2.0
+- [ ] V5.1 `authSchema`, `request.auth` y flujo `client_credentials`
+- [ ] V5.2 Flujo `refresh_token`
+- [ ] V5.3 `authorization_code` + PKCE, `token-store`, `httpi auth login|status`
+- [ ] V5.4 Asistente `httpi auth add`
+
+### V6 — Importar Postman
+- [ ] V6.1 `importer/postman.ts`: colección v2.1 → `TestFile[]` + advertencias
+- [ ] V6.2 `httpi import --from`, salida a carpeta, entorno Postman → `env`
+
+### V7 — Importar OpenAPI
+- [ ] V7.1 `importer/openapi.ts`: operaciones, `servers`, parámetros, `expect.status`
+- [ ] V7.2 `$ref` locales, ejemplos de body, `securitySchemes` → `auth`
+
+### V8 — Selector de archivos
+- [ ] V8.1 Estado puro del selector con tests
+- [ ] V8.2 Componente Ink (teclado y mouse)
+- [ ] V8.3 Integración en multipart, datos e importación
+
+### V9 — Cierre
+- [ ] V9.1 README y ejemplo completo en `examples/`
+- [ ] V9.2 MCP sobre el proyecto
+- [ ] V9.3 Medir tiempo de arranque y sobrecosto frente a curl directo
+
 ## Decisiones
 Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 
@@ -108,6 +157,8 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-12 — U5 solicitada por el usuario: se autoriza la captura de tokens como excepción al alcance inicial. El asistente permite seleccionar un campo JSON del login y añadir Authorization Bearer en las siguientes requests; guarda solo `capture.authToken` y la referencia, nunca el token capturado. Cada ejecución autentica de nuevo y detiene el flujo si falla el login, sus asserts o la extracción. La variable reservada no cae a tokens antiguos; los reportes ocultan la respuesta de autenticación y redactan tokens capturados. Capturas limitadas a Bearer JSON, sin OAuth ni scripting; exportación curl estática rechazada para estos flujos. Demo local de login/ruta protegida y GIF actualizados. Verificado: 457 tests, CLI real y recorrido con mouse que guarda y repite el flujo con un token nuevo. Publicación npm sigue aplazada.
 
 - 2026-11-12 — U6 solicitada por el usuario: servidor MCP local por stdio, sin dependencias nuevas; herramientas list_tests, inspect_test, create_test y run_test sobre el motor existente. Protocolo con inicialización 2025-11-25 y negociación de tres versiones anteriores; no HTTP/OAuth/tareas MCP. Root obligatorio con comprobación de rutas reales; permisos de escritura/ejecución, orígenes y ambientes fijados al arrancar, sin escalado por el agente. MCP rechaza redirects, multipart y authToken en URLs; timeout por request máximo 30 s. Resultados estructurados omiten bodies, headers, valores esperados y diagnósticos con datos; inspección devuelve metadatos y requiere no poner secretos en sus nombres/rutas. No es un sandbox de SO ni configura automáticamente clientes. Se corrige la redacción del runner que alteraba claves estructurales con tokens cortos. Verificado con 468 tests y cliente oficial @modelcontextprotocol/sdk instalado solo temporalmente fuera del proyecto: descubrimiento, creación y dos ejecuciones con autenticación nueva. README incluye configuración Windows y comparación documental de 25 alternativas con fuentes oficiales, sin atribuir exclusividad MCP ni inventar benchmarks. Publicación npm sigue aplazada.
+
+- 2026-11-12 — v0.2: el usuario aprueba ejecutar el plan preparado en el chat de planificación ("httpi: plan de arquitectura y research"); queda como `PLAN.md` §15. OAuth, importación OpenAPI/Postman, capturas generales y mouse dejan de estar fuera de alcance. Sin dependencias nuevas (CSV y OAuth con módulos de Node). No se abre pull request a `main` hasta que el usuario lo pida.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.

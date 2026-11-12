@@ -342,6 +342,183 @@ Sin dependencia a propósito: `execa` (basta `node:child_process`), bundler (`ts
 
 Hecho cuando: el test pasa en los tres sistemas. Eso valida de entrada el mayor riesgo técnico (curl en Windows) y fija el contrato que usarán asserts, importador y TUI.
 
+## 15. v0.2 — Proyecto en un solo YAML
+
+Aprobado por el usuario el 2026-11-12. Las secciones 0–14 describen el MVP (v0.1) y quedan como referencia histórica; donde esta sección las contradiga (alcance, formato, mapa de archivos), manda esta.
+
+### Contexto
+
+El MVP está terminado en la rama `claude/bold-albattani-fsyz04` (fases F0–F7 y mejoras U1–U6; 468 tests; `main` sigue solo con plan y skills). Hoy cada archivo de prueba se ejecuta por separado (`httpi run <archivo>`), los entornos viven en `httpi.env.yaml`, la única captura es `authToken`, y el README reconoce cuatro huecos: selección de archivos, importación OpenAPI/Postman, OAuth guiado y colaboración centralizada.
+
+Objetivo de v0.2, según lo acordado:
+
+1. **Un archivo lo define todo:** `httpi.yaml` declara entornos, autenticación, qué correr y reportes. En CI basta `httpi run`.
+2. **Datos desde CSV/JSON:** repetir requests una vez por fila.
+3. **Selección de archivos** en el asistente.
+4. **Importar OpenAPI 3 y Postman v2.1.**
+5. **OAuth 2.0 guiado.**
+6. **Colaboración basada en git** (sin servidor).
+
+Esto saca del "fuera del MVP" a OAuth, importación OpenAPI/Postman y capturas generales. Siguen fuera: GraphQL/gRPC, ejecución en paralelo, scripting, reportes HTML, servidor propio.
+
+### Diseño
+
+#### Archivo de proyecto `httpi.yaml`
+
+```yaml
+version: 1
+name: API de usuarios
+env:
+  default: dev
+  environments:
+    dev:  { baseUrl: "http://localhost:3000" }
+    prod: { baseUrl: "https://api.example.com" }
+auth:
+  main:
+    type: oauth2
+    flow: client_credentials
+    tokenUrl: "{{baseUrl}}/oauth/token"
+    clientId: "${CLIENT_ID}"
+    clientSecret: "${CLIENT_SECRET}"
+    scopes: [users.read]
+run:
+  - tests/login.yaml
+  - file: tests/users.yaml
+    data: data/users.csv
+  - tests/admin/*.yaml
+report:
+  junit: reports/junit.xml
+```
+
+- `httpi run` sin argumentos busca `httpi.yaml` hacia arriba desde el directorio actual. `httpi run <archivo>` sigue funcionando igual que hoy.
+- `run:` acepta ruta, patrón (`fs.glob` de Node 22) u objeto `{ file, data }`. Orden = orden de la lista; los patrones se ordenan alfabéticamente.
+- Las variables capturadas y los tokens se comparten entre todos los archivos de la corrida.
+- `httpi.env.yaml` se sigue leyendo; si existen ambos, gana `httpi.yaml` y se avisa.
+- Los archivos de prueba conservan `version: 1`; todos los campos nuevos son opcionales.
+
+#### Cambios al formato de prueba (compatibles)
+
+| Campo | Hoy | v0.2 |
+|---|---|---|
+| `capture` | `{ authToken: <jsonpath> }` | `{ <nombre>: <jsonpath> }`; `authToken` conserva su comportamiento (respuesta oculta, flujo se detiene) |
+| `data` (en un test) | — | Ruta a CSV/JSON; el test corre una vez por fila, con `{{data.columna}}` |
+| `request.auth` | — | Nombre de un bloque `auth` del proyecto; inyecta `Authorization: Bearer` |
+| `body.form` con `@ruta` | Relativa al directorio actual | Relativa al YAML que la declara |
+
+#### Datos
+
+- CSV: primera fila = cabeceras, RFC 4180 (comillas, comas y saltos dentro de comillas). Parser propio pequeño, sin dependencia nueva.
+- JSON: arreglo de objetos planos.
+- Cada fila genera un resultado `nombre [fila N]`; un fallo no detiene las demás filas.
+- Archivo vacío, cabecera duplicada o columna inexistente → salida 2 antes de enviar nada.
+
+#### OAuth 2.0
+
+| Flujo | Uso | Cómo |
+|---|---|---|
+| `client_credentials` | CI | Token pedido con el runner de curl antes del primer uso; en memoria |
+| `authorization_code` + PKCE | Local | `httpi auth login <nombre>`: abre el navegador, callback en `127.0.0.1` con `node:http`, PKCE con `node:crypto` |
+| `refresh_token` | CI con cuenta de usuario | Refresh token desde `${VAR}`; se canjea al iniciar |
+
+- Tokens locales en `.httpi/tokens.json` (permisos 600, ignorado por git). Nunca en el YAML.
+- Tokens obtenidos entran en la lista de secretos de `maskSecrets`.
+- Asistente: `httpi auth add` pregunta flujo, URLs, scopes y nombres de variables; escribe el bloque en `httpi.yaml`.
+- Sin dependencias nuevas. Fuera: device code, JWT bearer, mTLS.
+
+#### Importadores
+
+`httpi import` gana `--from curl|openapi|postman` (autodetección por contenido) y `-o` acepta carpeta.
+
+| Origen | Genera | No soporta (avisa) |
+|---|---|---|
+| OpenAPI 3.0/3.1 (YAML/JSON) | Un archivo por tag; un test por operación; `{{baseUrl}}` desde `servers`; parámetros de ruta como `{{param}}`; body desde `example`; `expect.status` = primer 2xx; `securitySchemes` → bloque `auth` | Swagger 2, `$ref` remotos, `oneOf` sin ejemplo |
+| Postman v2.1 | Un archivo por carpeta; `{{var}}` se conserva tal cual; auth bearer/basic/oauth2; entorno Postman → `env` | Scripts pre-request y tests JS |
+
+Regla existente que se mantiene: nada se descarta en silencio; cada elemento no convertido produce una advertencia.
+
+#### Selección de archivos
+
+Componente `FilePicker` (teclado y mouse, reusa `mouse-controls`) con estado puro separado. Se usa en el asistente para: campo de archivo en multipart, archivo de datos, y spec a importar. Guarda rutas relativas al YAML.
+
+#### Colaboración por git
+
+- `httpi init`: crea `httpi.yaml`, `tests/`, `data/`, añade `.httpi/` y `httpi.local.yaml` a `.gitignore`, y copia el workflow de `examples/github-actions.yml`.
+- `httpi.local.yaml`: valores personales y secretos, fuera de git. Precedencia: `--var` > entorno del sistema > `httpi.local.yaml` > `httpi.yaml`.
+- `httpi validate`: revisa todos los archivos del proyecto sin enviar requests (esquema, variables sin resolver, rutas inexistentes, secretos literales en `Authorization`/`Cookie`). Sale 0 o 2; pensado para pull requests.
+
+### Archivos
+
+Nuevos:
+
+| Archivo | Responsabilidad |
+|---|---|
+| `src/core/project.ts` | Localizar y leer `httpi.yaml`, expandir `run:`, fusionar entornos |
+| `src/core/data.ts` | Parser CSV y lector JSON → filas |
+| `src/core/auth/oauth.ts` | Obtener/renovar tokens por flujo |
+| `src/core/auth/token-store.ts` | `.httpi/tokens.json` |
+| `src/core/auth/login.ts` | Callback local + PKCE |
+| `src/core/importer/openapi.ts` | Spec → `TestFile[]` + advertencias |
+| `src/core/importer/postman.ts` | Colección → `TestFile[]` + advertencias |
+| `src/core/validate.ts` | Comprobaciones estáticas del proyecto |
+| `src/tui/file-picker.tsx`, `file-picker-state.ts` | Explorador de archivos |
+| `src/tui/auth-wizard.tsx` | Alta guiada de OAuth |
+
+Modificados (reutilizar, no duplicar):
+
+- `src/core/schema.ts`: `projectFileSchema`, `authSchema`, `capture` general, `data`, `request.auth`. Tipos por `z.infer`.
+- `src/core/run.ts`: extraer el bucle de `runTestFile` a un `runProject` que recibe varios archivos y un estado compartido (`runtime` de `VarSources`); filas de datos; resolver `auth` antes de `runRequest`.
+- `src/core/vars.ts`: añadir la fuente `local` y el espacio `data.*` a `VarSources`.
+- `src/core/capture.ts`: generalizar `captureAuthToken`; reutilizar `maskSecrets`.
+- `src/core/file.ts`: `readEnvironment` delega en `project.ts`; resolver rutas relativas al YAML.
+- `src/core/runner/curl-args.ts`: sin cambios de lógica; las rutas llegan ya resueltas.
+- `src/cli.ts`: `run` con argumento opcional, `import --from`, `init`, `validate`, `auth add|login|status`.
+- `src/mcp/tools.ts`: `run_test` acepta el proyecto; mantener sus restricciones actuales (sin tokens en URL, sin multipart).
+- `scripts/generate-schema.mjs`: publicar también `schema/httpi.project.schema.json`.
+- `examples/server.mjs`: endpoint `/oauth/token` de demostración para tests.
+
+### Fases
+
+Ritmo de 5–8 h/semana. Cada tarea sigue las skills `httpi-tarea` y `httpi-entrega`.
+
+| # | Fase | Tareas | Horas |
+|---|---|---|---|
+| V0 | Preparación | Integrar `claude/bold-albattani-fsyz04` a `main` (pull request, cuando el usuario lo pida). Actualizar `PLAN.md` (sección v0.2), lista "fuera del MVP" de `CLAUDE.md` y fases nuevas en `PROGRESS.md` | 2 |
+| V1 | Proyecto | `projectFileSchema`, `project.ts`, `run` sin argumentos, patrones, entornos en `httpi.yaml`, `report.junit`, esquema publicado | 10 |
+| V2 | Capturas generales | `capture` como mapa, variables compartidas entre archivos, validación previa de referencias | 6 |
+| V3 | Datos | `data.ts`, `data` en test y en `run:`, nombres por fila, reporters | 8 |
+| V4 | Colaboración | `httpi init`, `httpi.local.yaml`, `httpi validate`, rutas relativas al YAML | 7 |
+| V5 | OAuth | `client_credentials` y `refresh_token`; luego `authorization_code` + PKCE, `token-store`, `auth login/status`; asistente `auth add` | 14 |
+| V6 | Importar Postman | `postman.ts`, entornos, `import --from`, salida a carpeta | 8 |
+| V7 | Importar OpenAPI | `openapi.ts`, `$ref` locales, ejemplos, `securitySchemes` → `auth` | 12 |
+| V8 | Selector de archivos | Estado puro, componente Ink, integración en multipart/datos/import | 7 |
+| V9 | Cierre | README, ejemplo completo en `examples/`, MCP sobre proyecto, medir tiempo de arranque y sobrecosto frente a curl directo (la comparación del README es solo documental) | 6 |
+
+Total: ~80 h, entre 10 y 16 semanas. Corte usable tras V4: un `httpi.yaml` que corre todo en CI con datos y entornos compartidos.
+
+Orden obligado: V1 → V2 → V3. V5, V6, V7 y V8 dependen solo de V1 y pueden reordenarse. V6 antes que V7 porque es más simple y fija la salida multiarchivo que V7 reutiliza.
+
+### Riesgos
+
+| Riesgo | Mitigación |
+|---|---|
+| `run.ts` ya concentra token, máscara y bucle; ampliarlo lo vuelve frágil | V1 empieza extrayendo el estado compartido con los 468 tests en verde antes de añadir nada |
+| OpenAPI es enorme | Lista cerrada de lo soportado; lo demás, advertencia. Fixtures reales (Petstore y una spec con `$ref`) |
+| Tokens OAuth filtrados en reportes o en git | Todos pasan por `maskSecrets`; `.httpi/` en `.gitignore` desde `init`; `validate` detecta secretos literales |
+| `authorization_code` no se puede probar en CI | Test con servidor de autorización falso en `node:http`; el paso de navegador se simula con una petición al callback |
+| Cambiar la base de las rutas de `form` rompe archivos existentes | Solo cambia cuando la ruta es relativa; anotarlo en "Decisiones" y en el README |
+| Windows: permisos 600 no aplican | Documentarlo; el archivo queda en el perfil del usuario bajo `.httpi/` |
+
+### Verificación
+
+Por fase, además de `npm run check` y la matriz de CI (ubuntu/macos/windows × Node 22/24):
+
+- **V1–V3:** e2e con `examples/server.mjs`: un `httpi.yaml` con dos archivos, un patrón y un CSV de 3 filas; comprobar número de resultados, orden, códigos de salida 0/1/2/3 y JUnit generado.
+- **V4:** `httpi init` en un directorio temporal seguido de `httpi validate` y `httpi run`; `validate` debe salir 2 con un `Authorization` literal.
+- **V5:** e2e contra `/oauth/token` del servidor de ejemplo; verificar que el token no aparece en stdout, JUnit ni MCP. Prueba manual de `auth login` en una terminal real.
+- **V6–V7:** importar fixtures reales, ejecutar `httpi validate` sobre lo generado y correr al menos una operación contra el servidor local; revisar que cada elemento omitido tenga advertencia.
+- **V8:** tests del estado puro y de render con `ink-testing-library`; recorrido manual con teclado y mouse.
+- **V9:** instalar el tarball en un directorio limpio y repetir el flujo `init` → `import` → `run`.
+
 ## Fuentes consultadas
 
 - curl, man page (`--write-out`, `--json`, `-D`, `-o`): https://curl.se/docs/manpage.html
