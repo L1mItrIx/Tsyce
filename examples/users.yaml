@@ -1,0 +1,15 @@
+version: 1
+name: API de ejemplo
+tests:
+  - name: GET /users devuelve usuarios
+    request:
+      method: GET
+      url: "{{baseUrl}}/users"
+    expect:
+      status: 200
+      maxTimeMs: 2000
+      headers:
+        content-type: { contains: application/json }
+      json:
+        - { path: "$.users[0].id", equals: 1 }
+        - { path: "$.users[0].name", type: string }

@@ -1,0 +1,32 @@
+# Copy to .github/workflows/api-tests.yml in this repository.
+name: API tests example
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Start the example API and test it
+        shell: bash
+        run: |
+          node examples/server.mjs &
+          api_pid=$!
+          trap 'kill "$api_pid"' EXIT
+          for attempt in {1..50}; do
+            if curl -fsS http://127.0.0.1:3000/users > /dev/null; then break; fi
+            sleep 0.1
+          done
+          node dist/cli.js run examples/users.yaml --env dev --reporter junit > results.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-test-results
+          path: results.xml

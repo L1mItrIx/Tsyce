@@ -46,7 +46,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 
 ## Fase 7 — CI y publicación
 - [x] F7.1 Reporter JUnit; commit `F7.1: add JUnit XML output for CI`
-- [~] F7.2 README con ejemplo de GitHub Actions; rama `claude/bold-albattani-fsyz04`
+- [x] F7.2 README con ejemplo de GitHub Actions; commit `F7.2: document the CLI with a runnable API and CI example`
 - [ ] F7.3 Publicar `httpi.schema.json`
 - [ ] F7.4 Decidir nombre en npm (pendiente del usuario) y `npm publish`
 
