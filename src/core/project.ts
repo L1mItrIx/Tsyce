@@ -2,8 +2,8 @@ import { existsSync } from 'node:fs';
 import { glob, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { ENV_FILE_NAME, parseWith, readEnvironment, readTextFile, TestFileError } from './file.js';
-import { localFileSchema, type ProjectFile, projectFileSchema } from './schema.js';
-import { stringify } from 'yaml';
+import { type AuthConfig, localFileSchema, type ProjectFile, projectFileSchema } from './schema.js';
+import { parseDocument, stringify } from 'yaml';
 
 export const PROJECT_FILE_NAME = 'httpi.yaml';
 export const LOCAL_FILE_NAME = 'httpi.local.yaml';
@@ -165,4 +165,13 @@ export async function initProject(dir: string): Promise<InitStep[]> {
   }
   steps.push({ path: '.gitignore', action: current === null ? 'created' : missing.length > 0 ? 'updated' : 'kept' });
   return steps;
+}
+
+/** Adds an auth block to httpi.yaml, keeping the rest of the file (comments included) as it is. */
+export async function addAuthBlock(projectPath: string, name: string, block: AuthConfig): Promise<void> {
+  const project = await readProjectFile(projectPath);
+  if (project.auth?.[name] !== undefined) throw new TestFileError(`${projectPath}: there is already an auth block named "${name}"`);
+  const document = parseDocument(await readTextFile(projectPath));
+  document.setIn(['auth', name], document.createNode(block));
+  await writeFile(projectPath, document.toString({ lineWidth: 0 }));
 }

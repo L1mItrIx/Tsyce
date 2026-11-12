@@ -210,3 +210,9 @@ test.each<[name: string, args: string[], stderr: RegExp]>([
   expect(result.stderr).toMatch(stderr);
   expect(result.code).toBe(2);
 });
+
+test('auth add refuses non-interactive input with exit 2 instead of hanging', async () => {
+  const result = await httpi(['auth', 'add'], { cwd: root });
+  expect(result.stderr).toContain('httpi auth add requires an interactive terminal');
+  expect(result.code).toBe(2);
+});

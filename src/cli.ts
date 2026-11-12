@@ -22,7 +22,7 @@ import {
 import { type Dialect, DIALECTS, tokenizeCurl } from './core/importer/detect-dialect.js';
 import { CurlImportError, extractSecrets, mapFlags } from './core/importer/map-flags.js';
 import { ShellSyntaxError } from './core/importer/tokenize-bash.js';
-import { expandRun, findProjectFile, initProject, PROJECT_FILE_NAME, projectEnvironment, readLocalValues, readProjectFile } from './core/project.js';
+import { addAuthBlock, expandRun, findProjectFile, initProject, PROJECT_FILE_NAME, projectEnvironment, readLocalValues, readProjectFile } from './core/project.js';
 import { formatPretty, formatPrettyProject } from './core/reporter/pretty.js';
 import { formatJUnit, formatJUnitSuites } from './core/reporter/junit.js';
 import { readDataFile, readTestRows } from './core/data.js';
@@ -165,6 +165,25 @@ async function authLoginCommand(name: string, options: VariableOptions): Promise
   });
   await saveStoredToken(tokenStorePath(projectPath), name, token);
   say(`httpi: logged in as "${name}"; the token is stored in .httpi/tokens.json (keep that directory out of git)`);
+  return EXIT.ok;
+}
+
+async function authAddCommand(): Promise<ExitCode> {
+  const projectPath = requireProject(undefined);
+  const project = await readProjectFile(projectPath);
+  if (!process.stdin.isTTY || !process.stderr.isTTY) {
+    throw new TestFileError(`httpi auth add requires an interactive terminal; without one, write the block under "auth" in ${PROJECT_FILE_NAME}`);
+  }
+  const { launchAuthWizard } = await import('./tui/auth-wizard.js');
+  const result = await launchAuthWizard(Object.keys(project.auth ?? {}));
+  if (result === null) { say('httpi: cancelled; httpi.yaml was not changed'); return EXIT.ok; }
+  await addAuthBlock(projectPath, result.name, result.block);
+  say(`httpi: added auth "${result.name}" to ${PROJECT_FILE_NAME}; use it in a test with "auth: ${result.name}" under request`);
+  const variables = [...JSON.stringify(result.block).matchAll(/\$\{(\w+)\}/g)].map((match) => match[1]);
+  if (variables.length > 0) say(`httpi: set ${variables.join(', ')} in the environment (in CI, as secrets)`);
+  if (result.block.flow === 'authorization_code') {
+    say(`httpi: register http://127.0.0.1:${result.block.redirectPort}/callback with the provider, then run "httpi auth login ${result.name}"`);
+  }
   return EXIT.ok;
 }
 
@@ -327,6 +346,11 @@ auth
   .option('--env <name>', 'environment used to resolve the variables of the auth block')
   .option('--var <name=value>', 'set a variable; repeatable', collectVar, {})
   .action((name: string, options: VariableOptions) => finish(authLoginCommand(name, options)));
+
+auth
+  .command('add')
+  .description('answer a few questions and add an OAuth 2.0 block to httpi.yaml (secrets are saved as ${VARIABLE} names)')
+  .action(() => finish(authAddCommand()));
 
 auth
   .command('status')

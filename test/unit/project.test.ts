@@ -1,10 +1,10 @@
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { TestFileError } from '../../src/core/file.js';
-import { expandRun, findProjectFile, projectEnvironment, readLocalValues, readProjectFile } from '../../src/core/project.js';
-import { projectFileSchema } from '../../src/core/schema.js';
+import { addAuthBlock, expandRun, findProjectFile, projectEnvironment, readLocalValues, readProjectFile } from '../../src/core/project.js';
+import { authSchema, projectFileSchema } from '../../src/core/schema.js';
 
 let root: string;
 
@@ -166,5 +166,31 @@ describe('readLocalValues', () => {
     } finally {
       await rm(local(), { force: true });
     }
+  });
+});
+
+describe('addAuthBlock', () => {
+  const path = () => join(root, 'tests', 'admin', 'deep', 'httpi.yaml');
+  const block = authSchema.parse({ type: 'oauth2', flow: 'client_credentials', tokenUrl: '{{baseUrl}}/oauth/token', clientId: 'ci', clientSecret: '${CLIENT_SECRET}', scopes: ['a', 'b'] });
+
+  test('adds the block and keeps the rest of the file, comments included; a second name joins the first', async () => {
+    await writeFile(path(), '# our API tests\nversion: 1\nrun:\n  - tests/*.yaml # everything\n');
+    await addAuthBlock(path(), 'main', block);
+    const text = await readFile(path(), 'utf8');
+    expect(text.startsWith('# our API tests\nversion: 1\nrun:\n  - tests/*.yaml # everything\nauth:\n  main:\n    type: oauth2\n')).toBe(true);
+    expect(text).toContain('    clientSecret: ${CLIENT_SECRET}\n');
+
+    await addAuthBlock(path(), 'admin', block);
+    const project = await readProjectFile(path());
+    expect(Object.keys(project.auth ?? {})).toEqual(['main', 'admin']);
+    expect(project.auth?.admin).toEqual(block);
+    expect(await readFile(path(), 'utf8')).toContain('# everything');
+  });
+
+  test('refuses a name that already exists and leaves the file untouched', async () => {
+    const before = await readFile(path(), 'utf8');
+    await expect(addAuthBlock(path(), 'main', block)).rejects.toThrow(/there is already an auth block named "main"/);
+    expect(await readFile(path(), 'utf8')).toBe(before);
+    await rm(path());
   });
 });
