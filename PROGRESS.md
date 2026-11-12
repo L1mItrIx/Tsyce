@@ -6,7 +6,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 
 ## Fase 0 — Base
 - [x] F0.1 Repo: `package.json` (ESM, Node >= 22), TS estricto, vitest, script `check`
-- [~] F0.2 CI: GitHub Actions, matriz ubuntu/macos/windows × Node 22/24 — rama `claude/bold-albattani-fsyz04`; falta confirmar la matriz en verde
+- [x] F0.2 CI: GitHub Actions, matriz ubuntu/macos/windows × Node 22/24
 - [x] F0.3 Prueba de humo: Ink 8 + ink-testing-library renderizan y leen `lastFrame()`
 
 ## Fase 1 — Runner
