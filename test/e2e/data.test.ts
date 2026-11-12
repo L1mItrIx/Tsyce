@@ -143,6 +143,35 @@ test('{{data.x}} without a data file is an unresolved variable', async () => {
   expect(run.code).toBe(2);
 });
 
+test('multipart file paths are relative to the test file, not to the directory httpi runs in', async () => {
+  let upload = '';
+  const receiver = createServer((req, res) => {
+    req.setEncoding('utf8').on('data', (chunk: string) => (upload += chunk));
+    req.on('end', () => res.end('{}'));
+  });
+  await new Promise<void>((resolve) => receiver.listen(0, '127.0.0.1', resolve));
+  try {
+    await write('tests/fixtures/hello.txt', 'file content from disk');
+    const file = await write('tests/upload.yaml', {
+      version: 1,
+      tests: [{
+        name: 'upload {{data.file}}',
+        request: { method: 'POST', url: `http://127.0.0.1:${(receiver.address() as AddressInfo).port}/upload`, body: { form: ['title=Hello', 'doc=@fixtures/{{data.file}};type=text/plain'] } },
+        expect: { status: 200 },
+        data: 'files.json',
+      }],
+    });
+    await write('tests/files.json', '[{"file":"hello.txt"}]');
+    const run = await httpi(['run', file], { cwd: tmpdir() });
+    expect(run.stdout).toContain('✓ upload hello.txt [row 1] (200,');
+    expect(upload).toContain('name="doc"; filename="hello.txt"');
+    expect(upload).toContain('file content from disk');
+    expect(run.code).toBe(0);
+  } finally {
+    await new Promise((resolve) => receiver.close(resolve));
+  }
+});
+
 test('export refuses a test that repeats over data instead of exporting it once', async () => {
   await write('tests/users.csv', 'name,role\nAna,admin\n');
   const file = await write('tests/users.yaml', { version: 1, tests: [createTest('users.csv')] });

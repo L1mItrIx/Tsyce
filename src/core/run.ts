@@ -1,6 +1,7 @@
 import { type AssertResult, checkExpectations } from './asserts.js';
 import { type RunResult, runRequest } from './runner/exec.js';
 import type { DataRow } from './data.js';
+import { resolveFormPaths } from './file.js';
 import type { TestFile } from './schema.js';
 import { captureAuthToken, captureValue, maskSecrets } from './capture.js';
 import { resolveVars, type VarSources } from './vars.js';
@@ -49,6 +50,8 @@ const EMPTY_SOURCES: VarSources = { cli: {}, system: {}, file: {} };
 /** A test file ready to run, with the rows of the data files it uses already read. */
 export type RunItem = {
   file: TestFile;
+  /** Directory of the test file: multipart file paths are relative to it. Without it they are left as written. */
+  baseDir?: string;
   /** Row of the data file given in `run:`; every test of the file sees it. */
   row?: DataRow;
   /** Per test, the rows of its own `data` file (see readTestRows). */
@@ -110,7 +113,7 @@ export async function runTestFiles(input: Array<TestFile | RunItem>, curlBin: st
     const outcomes = perFile[index]!;
     for (const run of testRuns(item)) {
       const test = resolvedTest(run, sources, runtime ?? sources.runtime);
-      const result = await runRequest(curlBin, test.request);
+      const result = await runRequest(curlBin, item.baseDir === undefined ? test.request : resolveFormPaths(test.request, item.baseDir));
       const asserts = result.error === null ? checkExpectations(test.expect, result) : [];
       if (!test.capture || !runtime) { outcomes.push({ name: test.name, result, asserts }); continue; }
 

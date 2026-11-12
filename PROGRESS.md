@@ -81,7 +81,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 - [x] V3.2 `data` en un test y en `run:`, `{{data.columna}}`, resultados `nombre [fila N]` en los reporters
 
 ### V4 — Colaboración por git
-- [ ] V4.1 Rutas de `body.form` (`@ruta`) y de `data` relativas al YAML que las declara
+- [x] V4.1 Rutas de `body.form` (`@ruta`) y de `data` relativas al YAML que las declara
 - [ ] V4.2 `httpi.local.yaml` y su precedencia
 - [ ] V4.3 `httpi init`
 - [ ] V4.4 `httpi validate`
@@ -166,6 +166,7 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-12 — V2.2: no requirió código nuevo: el bucle multiarchivo de V1.2 y la reserva de nombres de V2.1 ya comparten capturas entre archivos y validan el orden antes de enviar; se añadieron los e2e que lo fijan.
 - 2026-11-12 — V3.1: CSV separado por comas con cabecera obligatoria; los espacios forman parte del valor; las líneas en blanco se saltan; cada fila debe tener tantos campos como la cabecera. JSON: lista de objetos planos (texto, número o booleano; `null` y anidados se rechazan). Los nombres de columna deben servir como `{{data.<nombre>}}`. Todo error de datos es `TestFileError` (salida 2) con archivo y línea.
 - 2026-11-12 — V3.2: `data` en un test (ruta relativa al archivo de prueba) lo repite por fila con el sufijo ` [row N]`; `data` en una entrada de `run:` (relativa a `httpi.yaml`) repite el archivo entero y cada fila es una suite `título [row N]`. `{{data.columna}}` solo lee la fila actual (nunca `--var` ni el sistema). Las filas se validan todas antes de enviar. `httpi export` y MCP rechazan tests con `data` en vez de ejecutarlos una sola vez.
+- 2026-11-12 — V4.1: cambio de comportamiento: en `httpi run`, las rutas relativas de `body.form` (`campo=@ruta`, `campo=<ruta`, varias con coma, con `;type=`) se resuelven contra la carpeta del YAML, después de sustituir variables; antes eran relativas al directorio actual. Rutas absolutas y `@-` no cambian. `httpi export` y el asistente `httpi new` siguen usando la ruta tal como está escrita.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.

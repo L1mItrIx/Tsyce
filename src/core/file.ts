@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { z } from 'zod';
 import { envFileSchema, type RequestSpec, type TestCase, type TestFile, testFileSchema } from './schema.js';
@@ -42,6 +42,26 @@ export function prepareWizardFile(tests: TestCase[], name?: string): { file: Tes
     return { ...test, name: tests.length === 1 && name !== undefined ? name : test.name, request: extracted.request };
   });
   return { file: { version: 1, ...(name !== undefined && tests.length > 1 ? { name } : {}), tests: prepared }, secrets };
+}
+
+/** Makes one curl --form expression point at files relative to `baseDir` instead of the current directory. */
+function resolveFormField(field: string, baseDir: string): string {
+  const equals = field.indexOf('=');
+  const marker = field[equals + 1];
+  if (equals === -1 || (marker !== '@' && marker !== '<')) return field; // a plain value, not a file
+  const rest = field.slice(equals + 2);
+  // The file name ends at ";type=..." / ";filename=..."; "@a,b" uploads several files.
+  const semicolon = rest.indexOf(';');
+  const names = semicolon === -1 ? rest : rest.slice(0, semicolon);
+  const options = semicolon === -1 ? '' : rest.slice(semicolon);
+  const paths = names.split(',').map((name) => (name === '-' || name === '' || isAbsolute(name) ? name : resolve(baseDir, name)));
+  return `${field.slice(0, equals + 2)}${paths.join(',')}${options}`;
+}
+
+/** Multipart file references (`name=@path`, `name=<path`) resolved against the directory of the file that declares them. */
+export function resolveFormPaths(request: RequestSpec, baseDir: string): RequestSpec {
+  if (request.body === undefined || !('form' in request.body)) return request;
+  return { ...request, body: { form: request.body.form.map((field) => resolveFormField(field, baseDir)) } };
 }
 
 /** Parses YAML (JSON is valid YAML) against a schema; `kind` names the document in errors. */

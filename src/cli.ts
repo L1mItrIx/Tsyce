@@ -46,7 +46,7 @@ const prettyOptions = (options: RunOptions) => ({
 
 async function runFileCommand(path: string, options: RunOptions): Promise<ExitCode> {
   const file = await readTestFile(path);
-  const item = { file, testRows: await readTestRows(file, path) };
+  const item = { file, baseDir: dirname(resolve(path)), testRows: await readTestRows(file, path) };
   const sources = {
     cli: options.var,
     system: process.env,
@@ -74,8 +74,9 @@ async function runProjectCommand(projectPath: string, options: RunOptions): Prom
     const file = await readTestFile(target.file);
     const testRows = await readTestRows(file, target.file);
     const title = resolveVars(file.name, sources) ?? relative(dirname(projectPath), target.file).replaceAll('\\', '/');
-    if (target.data === undefined) items.push({ file, testRows, title });
-    else for (const [index, row] of (await readDataFile(target.data)).entries()) items.push({ file, testRows, row, title: `${title} [row ${index + 1}]` });
+    const baseDir = dirname(target.file);
+    if (target.data === undefined) items.push({ file, baseDir, testRows, title });
+    else for (const [index, row] of (await readDataFile(target.data)).entries()) items.push({ file, baseDir, testRows, row, title: `${title} [row ${index + 1}]` });
   }
   validateRunVariables(items, sources);
   const curl = await detectCurl();

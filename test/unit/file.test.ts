@@ -1,6 +1,6 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
 import {
   defaultTestName,
@@ -8,6 +8,7 @@ import {
   parseTestFile,
   readEnvironment,
   readTestFile,
+  resolveFormPaths,
   stringifyTestFile,
   TestFileError,
   writeTestFile,
@@ -198,4 +199,26 @@ test('writeTestFile creates the file and refuses to replace an existing one', as
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test.each<[name: string, field: string, expected: (base: string) => string]>([
+  ['a plain value is not a file', 'name=Ana', () => 'name=Ana'],
+  ['an e-mail value is not a file', 'email=ana@example.com', () => 'email=ana@example.com'],
+  ['@path uploads a file', 'avatar=@img/a.png', (base) => `avatar=@${resolve(base, 'img/a.png')}`],
+  ['<path sends the content of a file', 'note=<notes/n.txt', (base) => `note=<${resolve(base, 'notes/n.txt')}`],
+  ['options after ; are kept', 'doc=@d.pdf;type=application/pdf;filename=x.pdf', (base) => `doc=@${resolve(base, 'd.pdf')};type=application/pdf;filename=x.pdf`],
+  ['several files', 'docs=@a.txt,sub/b.txt', (base) => `docs=@${resolve(base, 'a.txt')},${resolve(base, 'sub/b.txt')}`],
+  ['a parent directory', 'f=@../shared/f.bin', (base) => `f=@${resolve(base, '../shared/f.bin')}`],
+  ['an absolute path stays', `f=@${resolve('/abs/f.bin')}`, () => `f=@${resolve('/abs/f.bin')}`],
+  ['stdin stays', 'f=@-', () => 'f=@-'],
+  ['a field without = stays', 'nonsense', () => 'nonsense'],
+])('resolveFormPaths: %s', (_name, field, expected) => {
+  const base = resolve('project', 'tests');
+  const request = { method: 'POST', url: 'http://x', headers: {}, body: { form: [field] } };
+  expect(resolveFormPaths(request, base)).toEqual({ ...request, body: { form: [expected(base)] } });
+});
+
+test('resolveFormPaths leaves other bodies alone', () => {
+  const request = { method: 'POST', url: 'http://x', headers: {}, body: { text: 'a=@file' } };
+  expect(resolveFormPaths(request, '/base')).toBe(request);
 });
