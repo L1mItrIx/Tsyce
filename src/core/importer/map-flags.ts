@@ -237,7 +237,12 @@ export function mapFlags(tokens: string[]): ImportedRequest {
     if (arg.startsWith('--') && arg.length > 2) {
       const equals = arg.indexOf('=');
       if (equals === -1) handleFlag(state, arg, undefined, takeNext);
-      else handleFlag(state, arg.slice(0, equals), arg.slice(equals + 1), takeNext);
+      else {
+        // PLAN §3 asks to accept --flag=value, but curl itself rejects that spelling: say so.
+        const flag = arg.slice(0, equals);
+        state.warnings.push(`curl does not accept "${flag}=value"; it was read as "${flag} value"`);
+        handleFlag(state, flag, arg.slice(equals + 1), takeNext);
+      }
     } else if (arg.startsWith('-') && arg.length > 1 && arg !== '--') {
       // A cluster of short flags: -sSL, or -XPOST where the rest is the value of -X.
       for (let i = 1; i < arg.length; i++) {

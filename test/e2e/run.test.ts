@@ -1,31 +1,10 @@
-import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, expect, test } from 'vitest';
-
-const CLI = fileURLToPath(new URL('../../dist/cli.js', import.meta.url));
-
-type CliResult = { code: number | null; stdout: string; stderr: string };
-
-function httpi(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [CLI, ...args], {
-      env: { ...process.env, ...env },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.setEncoding('utf8').on('data', (chunk: string) => (stdout += chunk));
-    child.stderr.setEncoding('utf8').on('data', (chunk: string) => (stderr += chunk));
-    child.on('error', reject);
-    child.on('close', (code) => resolve({ code, stdout, stderr }));
-  });
-}
+import { assertCliIsBuilt, httpi } from './helpers.js';
 
 let server: Server;
 let baseUrl: string;
@@ -38,7 +17,7 @@ async function testFile(name: string, content: string): Promise<string> {
 }
 
 beforeAll(async () => {
-  if (!existsSync(CLI)) throw new Error('dist/cli.js is missing: run `npm run build` before the e2e tests');
+  assertCliIsBuilt();
   server = createServer((req, res) => {
     if (req.url === '/users/7') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -156,7 +135,7 @@ test('exit 3 when a request gets no response', async () => {
 
 test('exit 3 when curl is not available', async () => {
   const path = await testFile('nocurl.yaml', passingYaml());
-  const result = await httpi(['run', path], { HTTPI_CURL: 'httpi-no-such-curl-binary' });
+  const result = await httpi(['run', path], { env: { HTTPI_CURL: 'httpi-no-such-curl-binary' } });
   expect(result.stdout).toBe('');
   expect(result.stderr).toMatch(/^httpi: cannot run curl binary "httpi-no-such-curl-binary"/);
   expect(result.code).toBe(3);
@@ -178,8 +157,7 @@ test('--env, --var and ${ENV} fill the variables; --var wins over the system and
   const path = await testFile('vars.yaml', variablesYaml);
   await testFile('httpi.env.yaml', `local: { baseUrl: "${baseUrl}", id: 999, source: env-file }\n`);
   const result = await httpi(['run', path, '--env', 'local', '--var', 'id=7', '--var', 'source=a=b'], {
-    E2E_EXPECTED_NAME: 'Ana',
-    id: '555',
+    env: { E2E_EXPECTED_NAME: 'Ana', id: '555' },
   });
   expect(result.stderr).toBe('');
   expect(result.stdout).toContain('✓ user 7 from a=b (200,');
@@ -188,7 +166,7 @@ test('--env, --var and ${ENV} fill the variables; --var wins over the system and
 
 test('exit 2 when a variable has no value, naming each one', async () => {
   const path = await testFile('unresolved.yaml', variablesYaml);
-  const result = await httpi(['run', path, '--var', 'id=7'], { E2E_EXPECTED_NAME: undefined, source: undefined, baseUrl: undefined });
+  const result = await httpi(['run', path, '--var', 'id=7'], { env: { E2E_EXPECTED_NAME: undefined, source: undefined, baseUrl: undefined } });
   expect(result.stdout).toBe('');
   expect(result.stderr).toBe('httpi: unresolved variables: {{source}}, {{baseUrl}}, ${E2E_EXPECTED_NAME}\n');
   expect(result.code).toBe(2);

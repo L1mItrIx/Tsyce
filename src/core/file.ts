@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
-import { parse } from 'yaml';
+import { parse, stringify } from 'yaml';
 import { z } from 'zod';
 import { envFileSchema, type TestFile, testFileSchema } from './schema.js';
 
@@ -26,7 +26,7 @@ function parseWith<T>(schema: z.ZodType<T>, text: string, source: string, kind: 
   return result.data;
 }
 
-async function readText(path: string): Promise<string> {
+export async function readTextFile(path: string): Promise<string> {
   try {
     return await readFile(path, 'utf8');
   } catch (cause) {
@@ -40,7 +40,31 @@ export function parseTestFile(text: string, source: string): TestFile {
 }
 
 export async function readTestFile(path: string): Promise<TestFile> {
-  return parseTestFile(await readText(path), path);
+  return parseTestFile(await readTextFile(path), path);
+}
+
+/** YAML for a test file, leaving out what the schema fills in by default (no headers, no asserts). */
+export function stringifyTestFile(file: TestFile): string {
+  const tests = file.tests.map(({ name, request, expect }) => {
+    const { method, url, headers, ...rest } = request;
+    return {
+      name,
+      request: { method, url, ...(Object.keys(headers).length > 0 && { headers }), ...rest },
+      ...(Object.keys(expect).length > 0 && { expect }),
+    };
+  });
+  // Single quotes keep JSON bodies readable: '{"a":1}' instead of "{\"a\":1}".
+  return stringify({ ...file, tests }, { lineWidth: 0, singleQuote: true });
+}
+
+/** Writes a new test file; refuses to replace an existing one. */
+export async function writeTestFile(path: string, file: TestFile): Promise<void> {
+  try {
+    await writeFile(path, stringifyTestFile(file), { flag: 'wx' });
+  } catch (cause) {
+    const reason = (cause as NodeJS.ErrnoException).code === 'EEXIST' ? 'file already exists' : (cause as Error).message;
+    throw new TestFileError(`${path}: cannot write file: ${reason}`, { cause });
+  }
 }
 
 /**
@@ -55,7 +79,7 @@ export async function readEnvironment(testFilePath: string, envName: string): Pr
       `environment "${envName}" requested but there is no ${ENV_FILE_NAME} next to the test file or in the current directory`,
     );
   }
-  const environments = parseWith(envFileSchema, await readText(path), path, 'environment file');
+  const environments = parseWith(envFileSchema, await readTextFile(path), path, 'environment file');
   const variables = environments[envName];
   if (variables === undefined) {
     const available = Object.keys(environments).join(', ') || '(none)';

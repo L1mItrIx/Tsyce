@@ -96,7 +96,16 @@ describe('pasted forms', () => {
   table([
     ['-XPOST', ['-XPOST', API], { ...GET, method: 'POST' }],
     ["-H'value' glued to the flag", ['-HAccept: text/plain', API], { ...GET, headers: { Accept: 'text/plain' } }],
-    ['--flag=value', ['--request=PUT', '--header=A: b=c', `--url=${API}`], { method: 'PUT', url: API, headers: { A: 'b=c' } }],
+    [
+      '--flag=value is read, with a note that curl would reject it',
+      ['--request=PUT', '--header=A: b=c', `--url=${API}`],
+      { method: 'PUT', url: API, headers: { A: 'b=c' } },
+      [
+        'curl does not accept "--request=value"; it was read as "--request value"',
+        'curl does not accept "--header=value"; it was read as "--header value"',
+        'curl does not accept "--url=value"; it was read as "--url value"',
+      ],
+    ],
     ['a cluster of short flags', ['-kL', API], { ...GET, insecure: true, followRedirects: true }],
     ['a cluster ending in a flag with value', ['-kLXPUT', API], { ...GET, method: 'PUT', insecure: true, followRedirects: true }],
     ['a cluster whose value is the next argument', ['-kd', 'a=1', API], { ...GET, method: 'POST', insecure: true, body: { text: 'a=1' } }],
@@ -129,11 +138,12 @@ describe('flags outside the whitelist', () => {
       [
         'unsupported flag -o (and its value) was ignored',
         'unsupported flag --proxy (and its value) was ignored',
+        'curl does not accept "--connect-timeout=value"; it was read as "--connect-timeout value"',
         'unsupported flag --connect-timeout (and its value) was ignored',
       ],
     ],
     ['value glued to an unsupported short flag', ['-oout.json', API], GET, ['unsupported flag -o (and its value) was ignored']],
-    ['a toggle given a value', ['--location=yes', API], { ...GET, followRedirects: true }, ['flag --location does not take a value; "yes" was ignored']],
+    ['a toggle given a value', ['--location=yes', API], { ...GET, followRedirects: true }, ['curl does not accept "--location=value"; it was read as "--location value"', 'flag --location does not take a value; "yes" was ignored']],
     ['a flag missing its value at the end', [API, '-H'], GET, ['flag -H expects a value but the command ends there; ignored']],
     ['shell leftovers are reported', [API, '|', 'jq', '.'], GET, ['extra argument "|" was ignored', 'extra argument "jq" was ignored', 'extra argument "." was ignored']],
   ]);

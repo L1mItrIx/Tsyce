@@ -22,6 +22,7 @@
   "devDependencies": {
     "@types/node": "^22.20.5",
     "@types/react": "^19.3.0",
+    "curlconverter": "^4.12.0",
     "ink-testing-library": "^4.0.0",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"

@@ -1,8 +1,15 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import { parseTestFile, readEnvironment, readTestFile, TestFileError } from '../../src/core/file.js';
+import {
+  parseTestFile,
+  readEnvironment,
+  readTestFile,
+  stringifyTestFile,
+  TestFileError,
+  writeTestFile,
+} from '../../src/core/file.js';
 
 const PLAN_EXAMPLE_YAML = `
 version: 1
@@ -124,6 +131,40 @@ test('readEnvironment picks one environment from httpi.env.yaml next to the test
 
     await writeFile(join(dir, 'httpi.env.yaml'), 'dev: { nested: { a: 1 } }\n');
     await expect(readEnvironment(testPath, 'dev')).rejects.toThrow(/invalid environment file\n.*\n.*dev\.nested/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('stringifyTestFile writes YAML that reads back to the same model', () => {
+  const file = parseTestFile(PLAN_EXAMPLE_YAML, 'users.yaml');
+  expect(parseTestFile(stringifyTestFile(file), 'again.yaml')).toEqual(file);
+});
+
+test('stringifyTestFile leaves out empty headers and asserts, and keeps long or multi-line text intact', () => {
+  const body = `{"note": "${'x'.repeat(120)}",\n  "b": 1}`;
+  const file = parseTestFile(
+    JSON.stringify({ version: 1, tests: [{ name: 'POST /x', request: { method: 'POST', url: 'http://x', body: { text: body } } }] }),
+    'in.json',
+  );
+  const yaml = stringifyTestFile(file);
+  expect(yaml).not.toContain('headers');
+  expect(yaml).not.toContain('expect');
+  expect(yaml.startsWith('version: 1\ntests:\n  - name: POST /x\n    request:\n      method: POST\n      url: http://x\n')).toBe(true);
+  expect(parseTestFile(yaml, 'out.yaml')).toEqual(file);
+});
+
+test('writeTestFile creates the file and refuses to replace an existing one', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'file-test-write-'));
+  try {
+    const path = join(dir, 'new.yaml');
+    const file = parseTestFile(PLAN_EXAMPLE_YAML, 'users.yaml');
+    await writeTestFile(path, file);
+    expect(await readFile(path, 'utf8')).toBe(stringifyTestFile(file));
+
+    const again = writeTestFile(path, file);
+    await expect(again).rejects.toThrow(TestFileError);
+    await expect(again).rejects.toThrow(/new\.yaml: cannot write file: file already exists/);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
