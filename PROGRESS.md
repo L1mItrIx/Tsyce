@@ -32,7 +32,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 - [x] F4.4 `detect-dialect.ts` y `--dialect` (el flag `--dialect` se expone en F4.7)
 - [x] F4.5 `map-flags.ts` (lista blanca de PLAN §3) con advertencias
 - [x] F4.6 Detección de secretos → propuesta de `{{var}}`
-- [~] F4.7 `httpi import` + oráculo curlconverter en tests — rama `claude/bold-albattani-fsyz04`; falta confirmar CI en los tres SO (curlconverter trae binarios nativos)
+- [x] F4.7 `httpi import` + oráculo curlconverter en tests
 
 ## Fase 5 — Modo guiado
 - [ ] F5.1 Reducer puro del asistente (sin Ink) con tests
@@ -91,6 +91,7 @@ Ideas que surgieron y no se hicieron. No implementar sin aprobación.
 ## Bloqueos
 Qué impide avanzar y qué se necesita del usuario.
 
-- El prototipo en Ink del usuario no está en el repo (afecta F5.2).
+- El prototipo en Ink del usuario no está en el repo. Bloquea la fase 5: el reducer (F5.1) y las pantallas (F5.2) deben partir de su flujo.
 - Los fixtures de `test/fixtures/curl/` están escritos a mano con el formato de DevTools, no copiados de un navegador real. Hace falta que el usuario pegue curls reales ("Copy as cURL (bash)" y "(cmd)") para validar el riesgo de comillas de PLAN §11.
 - Sin verificar en cmd: cómo escapa DevTools una barra invertida dentro del body (p. ej. `\n` en JSON) en "Copy as cURL (cmd)". Se quitó ese caso del fixture inventado hasta tener un pegado real.
+- Decisión pendiente del usuario: `{{nombre}}` consulta el entorno del sistema antes que `httpi.env.yaml` (precedencia de PLAN §4). En Windows las variables de entorno no distinguen mayúsculas, así que un `{{path}}` o `{{username}}` del archivo de entornos quedaría tapado por el del sistema.
