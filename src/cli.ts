@@ -137,6 +137,19 @@ const program = new Command()
   .exitOverride((error) => process.exit(error.exitCode === 0 ? EXIT.ok : EXIT.invalid));
 
 program
+  .command('mcp')
+  .description('serve local MCP tools over stdio; execution and creation are disabled by default')
+  .requiredOption('--root <directory>', 'restrict test files to this directory')
+  .option('--allow-run', 'allow API requests, including methods that modify remote data')
+  .option('--allow-write', 'allow creation of new test files (never overwrites)')
+  .option('--allow-origin <origin>', 'approved HTTP(S) origin for execution; repeatable', (value: string, previous: string[]) => [...previous, value], [])
+  .option('--allow-env <name>', 'approved environment name; repeatable', (value: string, previous: string[]) => [...previous, value], [])
+  .action(async (options: import('./mcp/tools.js').McpOptions) => {
+    try { const { serveMcp } = await import('./mcp/server.js'); await serveMcp(options); }
+    catch { say('httpi: cannot start MCP; check --root and --allow-origin'); process.exitCode = EXIT.invalid; }
+  });
+
+program
   .command('run')
   .description('run the tests in a file; exit 0 = pass, 1 = assert failed, 2 = invalid file or usage, 3 = curl or network error')
   .argument('<file>', 'test file (YAML or JSON)')

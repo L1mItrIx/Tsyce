@@ -82,5 +82,11 @@ export async function runTestFile(file: TestFile, curlBin: string, sources: VarS
       if (!captured) break;
     } else outcomes.push({ name: test.name, result, asserts });
   }
-  return maskSecrets(outcomes, secrets);
+  // Preserve structural field names even when a token is a short substring such as "a".
+  return outcomes.map((outcome) => ({
+    ...outcome,
+    name: maskSecrets(outcome.name, secrets),
+    result: { ...outcome.result, headers: maskSecrets(outcome.result.headers, secrets), body: maskSecrets(outcome.result.body, secrets), error: maskSecrets(outcome.result.error, secrets) },
+    asserts: outcome.asserts.map((assert) => ({ ...assert, label: maskSecrets(assert.label, secrets), ...(assert.message !== undefined ? { message: maskSecrets(assert.message, secrets) } : {}) })),
+  }));
 }
