@@ -1,14 +1,15 @@
 {
-  "name": "httpi",
-  "version": "0.0.0",
-  "private": true,
+  "name": "httpi-cli",
+  "version": "0.1.0",
   "description": "Paste a curl or answer a few questions, and get an API test ready to run in CI.",
   "type": "module",
   "bin": {
     "httpi": "dist/cli.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "schema",
+    "examples"
   ],
   "engines": {
     "node": ">=22"
@@ -17,7 +18,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json && node scripts/generate-schema.mjs",
-    "check": "npm run typecheck && npm run build && npm run test"
+    "check": "npm run typecheck && npm run build && npm run test",
+    "prepack": "npm run check"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
@@ -34,5 +36,16 @@
     "react": "^19.3.1",
     "yaml": "^2.9.1",
     "zod": "^4.6.7"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/L1mItrIx/Tsyce.git"
+  },
+  "bugs": {
+    "url": "https://github.com/L1mItrIx/Tsyce/issues"
+  },
+  "homepage": "https://github.com/L1mItrIx/Tsyce#readme",
+  "publishConfig": {
+    "access": "public"
   }
 }

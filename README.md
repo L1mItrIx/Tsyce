@@ -24,6 +24,25 @@ httpi --help
 El paquete está preparado con el nombre **httpi-cli** y el ejecutable **httpi**.
 La instalación desde npm estará disponible después de publicar la primera versión.
 
+## Preparar o publicar el paquete
+
+```bash
+npm pack
+npm install -g ./httpi-cli-0.1.0.tgz
+httpi --help
+```
+
+`npm pack` ejecuta `npm run check` antes de generar el tarball. El paquete incluye
+el runtime, el esquema y los ejemplos; no incluye tests ni archivos de Claude.
+Para publicar en npm con una cuenta autorizada:
+
+```bash
+npm login
+npm publish --access public
+```
+
+La versión preparada es **0.1.0**. No hay publicación automática configurada.
+
 ## Crear una prueba con el asistente
 
 ```bash

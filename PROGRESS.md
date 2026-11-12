@@ -48,7 +48,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 - [x] F7.1 Reporter JUnit; commit `F7.1: add JUnit XML output for CI`
 - [x] F7.2 README con ejemplo de GitHub Actions; commit `F7.2: document the CLI with a runnable API and CI example`
 - [x] F7.3 Publicar `httpi.schema.json`; commit `F7.3: generate and publish JSON Schema from zod`
-- [~] F7.4 Nombre elegido: `httpi-cli`; preparar 0.1.0 y publicar (falta autenticación npm); rama `claude/bold-albattani-fsyz04`
+- [~] F7.4 `httpi-cli@0.1.0` preparado y tarball instalado/verificado; publicación aplazada por el usuario. Commit `F7.4: prepare httpi-cli 0.1.0 for npm distribution`
 
 ## Decisiones
 Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
@@ -76,13 +76,15 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 
 - 2026-11-11 — El usuario autoriza adelantar F6.1 mientras falta el prototipo de F5; se continúa en `claude/bold-albattani-fsyz04` por instrucción explícita.
 - 2026-11-11 — F6.1: `httpi export <archivo> --dialect bash|cmd|powershell` exporta todas las requests a stdout, con `--env` y `--var` y sin asserts. Reutiliza `buildCurlArgs`; salida contiene los secretos resueltos. Bash genera un comando; cmd un script `.cmd` (porcentajes duplicados y expansión retardada desactivada), no una línea para pegar en el prompt. PowerShell requiere 7.3+ y `Standard` para preservar comillas al invocar `curl.exe`. NUL se rechaza en todos; saltos de línea literales se rechazan en cmd con salida 2.
-- 2026-11-11 — F6.1: comprobación local en Linux/Node 24: 381 tests, typecheck y build; ejecución real Bash/curl conserva URL, headers y body. Los e2e ejecutan también cmd y PowerShell en Windows dentro de la matriz CI; resultado remoto pendiente.
+- 2026-11-11 — F6.1: comprobación local en Linux/Node 24: 381 tests, typecheck y build; ejecución real Bash/curl conserva URL, headers y body. Los e2e ejecutan también cmd y PowerShell en Windows dentro de la matriz CI; matriz completa en verde sobre `0d6d3fc`.
 
 - 2026-11-11 — El usuario autoriza completar F5 sin el prototipo y continuar el proyecto; nombre elegido para npm: `httpi-cli`. Se conserva la rama indicada.
 
 - 2026-11-11 — F5 completa sin prototipo: formulario con Enter/Tab y Esc; confirmación explícita antes de enviar, asserts seleccionables desde respuesta real y guardado YAML sin sobrescribir. `httpi new [archivo] --name ...` requiere TTY; Authorization/Cookie se extraen a variables igual que al importar. Ctrl+C aborta curl. Verificación local: 406 tests y recorrido manual en TTY que guardó y ejecutó un test con éxito.
 
-- 2026-11-11 — CI F5.4: las pruebas de Ink leían callbacks tras una espera fija; se cambia a esperar la condición `toHaveBeenCalledOnce` sin subir timeouts, saltar tests ni relajar asserts. La espera de callbacks no bastó en CI; se usa además `act()` para vaciar los efectos pasivos antes de escribir teclas (la pantalla visible precede a la suscripción de entrada). Verificación local: 414 tests; pendiente revalidación remota.
+- 2026-11-11 — CI F5.4: las pruebas de Ink leían callbacks tras una espera fija; se cambia a esperar la condición `toHaveBeenCalledOnce` sin subir timeouts, saltar tests ni relajar asserts. La espera de callbacks no bastó en CI; se usa además `act()` para vaciar los efectos pasivos antes de escribir teclas (la pantalla visible precede a la suscripción de entrada). Verificación local: 414 tests; CI corregida: seis jobs en verde sobre `8cd1e48` (Ubuntu/macOS/Windows × Node 22/24).
+
+- 2026-11-11 — F7.4: nombre `httpi-cli`, versión 0.1.0 y bin `httpi`; prepack ejecuta check. Tarball verificado: 29 archivos, ~28 kB; instalación aislada con dependencias de producción, `run --reporter junit` y asistente Ink probados. El usuario decide dejar la publicación npm pendiente; no se ha publicado. F6.2 (`fetch`) continúa opcional y pendiente.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.
@@ -101,7 +103,7 @@ Ideas que surgieron y no se hicieron. No implementar sin aprobación.
 ## Bloqueos
 Qué impide avanzar y qué se necesita del usuario.
 
-- Prototipo de Ink ausente: desbloqueado por instrucción del usuario de completar la fase 5 creando el flujo desde cero.
+- Publicación npm aplazada por el usuario; el tarball de 0.1.0 está preparado. No se requiere el prototipo de Ink: F5 se completó desde cero por instrucción del usuario.
 - Los fixtures de `test/fixtures/curl/` están escritos a mano con el formato de DevTools, no copiados de un navegador real. Hace falta que el usuario pegue curls reales ("Copy as cURL (bash)" y "(cmd)") para validar el riesgo de comillas de PLAN §11.
 - Sin verificar en cmd: cómo escapa DevTools una barra invertida dentro del body (p. ej. `\n` en JSON) en "Copy as cURL (cmd)". Se quitó ese caso del fixture inventado hasta tener un pegado real.
 - Decisión pendiente del usuario: `{{nombre}}` consulta el entorno del sistema antes que `httpi.env.yaml` (precedencia de PLAN §4). En Windows las variables de entorno no distinguen mayúsculas, así que un `{{path}}` o `{{username}}` del archivo de entornos quedaría tapado por el del sistema.
