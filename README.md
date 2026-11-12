@@ -148,5 +148,20 @@ Las fixtures de importación todavía no se han contrastado con pegados reales d
 DevTools en Windows. Los secretos enviados a curl viajan en argumentos visibles en
 la lista de procesos del sistema.
 
+## Autocompletado del YAML
+
+El esquema publicado en [schema/httpi.schema.json](schema/httpi.schema.json) se
+genera desde zod en cada `npm run build`. Con la extensión YAML de VS Code,
+añade un comentario al inicio del test (ajusta la ruta a tu archivo):
+
+```yaml
+# yaml-language-server: $schema=./schema/httpi.schema.json
+```
+
+También puedes usar la URL raw del esquema en GitHub. No añadas una propiedad
+`$schema` al test: el formato rechaza claves desconocidas. Las comprobaciones
+personalizadas de JSONPath y regex se realizan al ejecutar httpi; el esquema del
+editor no sustituye la validación del runner.
+
 No incluye encadenamiento de requests, OAuth, GraphQL/gRPC, importación de OpenAPI/Postman ni scripting.
 Consulta [PROGRESS.md](PROGRESS.md) para el avance y las limitaciones pendientes.

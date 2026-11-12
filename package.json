@@ -16,7 +16,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node scripts/generate-schema.mjs",
     "check": "npm run typecheck && npm run build && npm run test"
   },
   "devDependencies": {
