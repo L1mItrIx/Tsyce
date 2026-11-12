@@ -84,3 +84,11 @@ export type JsonExpect = z.infer<typeof jsonExpectSchema>;
 export type Expect = z.infer<typeof expectSchema>;
 export type TestCase = z.infer<typeof testSchema>;
 export type TestFile = z.infer<typeof testFileSchema>;
+
+/** httpi.env.yaml: environment name → variables. Scalars are read as text. */
+export const envFileSchema = z.record(
+  z.string(),
+  z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]).transform(String)),
+);
+
+export type EnvFile = z.infer<typeof envFileSchema>;

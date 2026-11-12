@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import { parseTestFile, readTestFile, TestFileError } from '../../src/core/file.js';
+import { parseTestFile, readEnvironment, readTestFile, TestFileError } from '../../src/core/file.js';
 
 const PLAN_EXAMPLE_YAML = `
 version: 1
@@ -99,6 +99,31 @@ test('readTestFile reads from disk and reports a missing file', async () => {
     const missing = readTestFile(join(dir, 'nope.yaml'));
     await expect(missing).rejects.toThrow(TestFileError);
     await expect(missing).rejects.toThrow(/nope\.yaml: cannot read file/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('readEnvironment picks one environment from httpi.env.yaml next to the test file', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'file-test-env-'));
+  try {
+    const testPath = join(dir, 'users.yaml');
+    await writeFile(
+      join(dir, 'httpi.env.yaml'),
+      'dev:  { baseUrl: "http://localhost:3000", retries: 3, debug: true }\nprod: { baseUrl: "https://api.example.com" }\n',
+    );
+    expect(await readEnvironment(testPath, 'dev')).toEqual({
+      baseUrl: 'http://localhost:3000',
+      retries: '3',
+      debug: 'true',
+    });
+
+    const unknown = readEnvironment(testPath, 'staging');
+    await expect(unknown).rejects.toThrow(TestFileError);
+    await expect(unknown).rejects.toThrow(/no environment "staging"; available: dev, prod/);
+
+    await writeFile(join(dir, 'httpi.env.yaml'), 'dev: { nested: { a: 1 } }\n');
+    await expect(readEnvironment(testPath, 'dev')).rejects.toThrow(/invalid environment file\n.*\n.*dev\.nested/);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

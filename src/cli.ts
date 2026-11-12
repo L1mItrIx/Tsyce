@@ -1,13 +1,20 @@
 #!/usr/bin/env node
-import { Command } from 'commander';
-import { readTestFile, TestFileError } from './core/file.js';
+import { Command, InvalidArgumentError } from 'commander';
+import { readEnvironment, readTestFile, TestFileError } from './core/file.js';
 import { formatPretty } from './core/reporter/pretty.js';
 import { EXIT, type ExitCode, exitCodeFor, runTestFile } from './core/run.js';
 import { detectCurl } from './core/runner/detect.js';
 import { CurlUnavailableError } from './core/runner/exec.js';
+import { resolveVars, UnresolvedVariableError } from './core/vars.js';
 
-async function runCommand(path: string): Promise<ExitCode> {
-  const file = await readTestFile(path);
+type RunOptions = { env?: string; var: Record<string, string> };
+
+async function runCommand(path: string, options: RunOptions): Promise<ExitCode> {
+  const file = resolveVars(await readTestFile(path), {
+    cli: options.var,
+    system: process.env,
+    file: options.env === undefined ? {} : await readEnvironment(path, options.env),
+  });
   const curl = await detectCurl();
   const outcomes = await runTestFile(file, curl.bin);
   const color = process.stdout.isTTY === true && !process.env.NO_COLOR;
@@ -16,9 +23,15 @@ async function runCommand(path: string): Promise<ExitCode> {
 }
 
 function exitCodeForError(error: unknown): ExitCode {
-  if (error instanceof TestFileError) return EXIT.invalid;
+  if (error instanceof TestFileError || error instanceof UnresolvedVariableError) return EXIT.invalid;
   if (error instanceof CurlUnavailableError) return EXIT.curl;
   throw error;
+}
+
+function collectVar(pair: string, previous: Record<string, string>): Record<string, string> {
+  const separator = pair.indexOf('=');
+  if (separator <= 0) throw new InvalidArgumentError('Expected name=value.');
+  return { ...previous, [pair.slice(0, separator)]: pair.slice(separator + 1) };
 }
 
 const program = new Command()
@@ -31,9 +44,11 @@ program
   .command('run')
   .description('run the tests in a file; exit 0 = pass, 1 = assert failed, 2 = invalid file or usage, 3 = curl or network error')
   .argument('<file>', 'test file (YAML or JSON)')
-  .action(async (path: string) => {
+  .option('--env <name>', 'environment from httpi.env.yaml')
+  .option('--var <name=value>', 'set a variable; repeatable, wins over the environment', collectVar, {})
+  .action(async (path: string, options: RunOptions) => {
     try {
-      process.exitCode = await runCommand(path);
+      process.exitCode = await runCommand(path, options);
     } catch (error) {
       process.exitCode = exitCodeForError(error);
       process.stderr.write(`httpi: ${(error as Error).message}\n`);

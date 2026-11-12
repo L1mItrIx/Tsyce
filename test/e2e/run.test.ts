@@ -161,3 +161,49 @@ test('exit 3 when curl is not available', async () => {
   expect(result.stderr).toMatch(/^httpi: cannot run curl binary "httpi-no-such-curl-binary"/);
   expect(result.code).toBe(3);
 });
+
+const variablesYaml = `
+version: 1
+tests:
+  - name: user {{id}} from {{source}}
+    request:
+      url: "{{baseUrl}}/users/{{id}}"
+    expect:
+      status: 200
+      json:
+        - { path: "$.name", equals: "\${E2E_EXPECTED_NAME}" }
+`;
+
+test('--env, --var and ${ENV} fill the variables; --var wins over the system and the env file', async () => {
+  const path = await testFile('vars.yaml', variablesYaml);
+  await testFile('httpi.env.yaml', `local: { baseUrl: "${baseUrl}", id: 999, source: env-file }\n`);
+  const result = await httpi(['run', path, '--env', 'local', '--var', 'id=7', '--var', 'source=a=b'], {
+    E2E_EXPECTED_NAME: 'Ana',
+    id: '555',
+  });
+  expect(result.stderr).toBe('');
+  expect(result.stdout).toContain('✓ user 7 from a=b (200,');
+  expect(result.code).toBe(0);
+});
+
+test('exit 2 when a variable has no value, naming each one', async () => {
+  const path = await testFile('unresolved.yaml', variablesYaml);
+  const result = await httpi(['run', path, '--var', 'id=7'], { E2E_EXPECTED_NAME: undefined, source: undefined, baseUrl: undefined });
+  expect(result.stdout).toBe('');
+  expect(result.stderr).toBe('httpi: unresolved variables: {{source}}, {{baseUrl}}, ${E2E_EXPECTED_NAME}\n');
+  expect(result.code).toBe(2);
+});
+
+test('exit 2 for an environment that is not in httpi.env.yaml', async () => {
+  const path = await testFile('vars.yaml', variablesYaml);
+  await testFile('httpi.env.yaml', 'local: { baseUrl: "http://x" }\n');
+  const result = await httpi(['run', path, '--env', 'prod']);
+  expect(result.stderr).toMatch(/no environment "prod"; available: local/);
+  expect(result.code).toBe(2);
+});
+
+test('exit 2 for a malformed --var', async () => {
+  const result = await httpi(['run', 'x.yaml', '--var', 'novalue']);
+  expect(result.stderr).toMatch(/^error: option '--var <name=value>' argument 'novalue' is invalid\. Expected name=value\./);
+  expect(result.code).toBe(2);
+});
