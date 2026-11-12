@@ -69,7 +69,13 @@ export const expectSchema = z.strictObject({
   json: z.array(jsonExpectSchema).optional(),
 });
 
-export const captureSchema = z.strictObject({ authToken: jsonPath });
+/**
+ * Values taken from the response for later requests: variable name → JSONPath.
+ * `authToken` is special: its response is hidden and its value is redacted from reports.
+ */
+export const captureSchema = z
+  .record(z.string().regex(/^[A-Za-z_][\w.-]*$/, 'capture name must be a variable name, e.g. userId'), jsonPath)
+  .refine((capture) => Object.keys(capture).length > 0, { error: 'capture needs at least one name: { name: <JSONPath> }' });
 export type Capture = z.infer<typeof captureSchema>;
 
 export const testSchema = z.strictObject({

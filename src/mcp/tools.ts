@@ -87,9 +87,12 @@ export async function createToolHandler(options: McpOptions) {
     }
     const sources = { cli: run.variables, system: process.env, file: run.env === undefined ? {} : await readEnvironment(path, run.env) };
     validateRunVariables(file, sources);
+    // A captured value is only known at run time, so it must not decide where a request goes.
+    const captured = [...new Set(file.tests.flatMap((test) => Object.keys(test.capture ?? {})))];
+    const usesCapture = (text: string) => [...text.matchAll(/\{\{\s*([^{}\s]+)\s*\}\}/g)].some((match) => captured.includes(match[1]!));
     for (const test of file.tests) {
-      if (/\{\{\s*authToken\s*\}\}/.test(test.request.url)) throw new Error('In MCP flows use the captured token in headers, not in the URL');
-      const request = resolveVars(test.request, { ...sources, runtime: { authToken: '[runtime-token]' } });
+      if (usesCapture(test.request.url)) throw new Error('In MCP flows use captured values in headers or bodies, not in the URL');
+      const request = resolveVars(test.request, { ...sources, runtime: Object.fromEntries(captured.map((name) => [name, '[runtime-value]'])) });
       const url = new URL(request.url);
       if (!['http:', 'https:'].includes(url.protocol) || !allowedOrigins.has(url.origin) || url.username || url.password) throw new Error('Request origin is not allowed; configure --allow-origin at startup and use headers for credentials');
       if (request.followRedirects) throw new Error('MCP flows cannot follow redirects; configure the final approved URL');

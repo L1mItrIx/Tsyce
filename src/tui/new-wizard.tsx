@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
-import type { RequestSpec, Expect, Capture } from '../core/schema.js';
+import type { RequestSpec, Expect } from '../core/schema.js';
 import { captureAuthToken, maskSecrets, responseTokenFields } from '../core/capture.js';
 import { checkExpectations } from '../core/asserts.js';
 import type { RunResult } from '../core/runner/exec.js';
@@ -10,7 +10,7 @@ import { MouseTarget } from './mouse-controls.js';
 import { TokenPicker } from './token-picker.js';
 
 export type SendRequest = (request: RequestSpec, signal: AbortSignal) => Promise<RunResult>;
-export type CapturedAuth = { capture: Capture; value: string };
+export type CapturedAuth = { capture: { authToken: string }; value: string };
 type NewWizardProps = {
   sendRequest: SendRequest;
   onComplete: (request: RequestSpec, expected: Expect, auth?: CapturedAuth) => void;

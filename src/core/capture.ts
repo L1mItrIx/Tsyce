@@ -1,5 +1,4 @@
 import { jsonpath, type JSONValue } from 'json-p3';
-import type { Capture } from './schema.js';
 import type { RunResult } from './runner/exec.js';
 
 export class CaptureError extends Error { override name = 'CaptureError'; }
@@ -10,13 +9,26 @@ const tokenValue = (value: unknown): value is string => {
   return token !== '' && !/[\s\x00-\x1f\x7f]/.test(token);
 };
 
-export function captureAuthToken(result: RunResult, capture: Capture): string {
+export function captureAuthToken(result: RunResult, capture: { authToken: string }): string {
   if (result.error !== null || result.status < 200 || result.status >= 300) throw new CaptureError('Authentication must succeed before capturing a token.');
   try {
     const values = jsonpath.query(capture.authToken, JSON.parse(result.body) as JSONValue).map((node) => node.value);
     if (values.length !== 1 || !tokenValue(values[0])) throw new Error('invalid token');
     return values[0].replace(/^Bearer\s+/i, '');
   } catch { throw new CaptureError('Select exactly one non-empty token string from the JSON response.'); }
+}
+
+/** Reads the one text, number or boolean that `path` selects in the JSON response, as text. */
+export function captureValue(result: RunResult, path: string): string {
+  let body: JSONValue;
+  try { body = JSON.parse(result.body) as JSONValue; } catch { throw new CaptureError('response body is not valid JSON'); }
+  const values = jsonpath.query(path, body).map((node) => node.value);
+  if (values.length === 0) throw new CaptureError('no match');
+  if (values.length > 1) throw new CaptureError(`${values.length} matches; the path must select exactly one value`);
+  const value = values[0];
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  throw new CaptureError(`selected ${value === null ? 'null' : Array.isArray(value) ? 'an array' : 'an object'}; only text, numbers and booleans can be captured`);
 }
 
 /** Lists paths only, never token values. Bound traversal to keep the picker responsive. */

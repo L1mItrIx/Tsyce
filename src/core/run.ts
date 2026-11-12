@@ -1,7 +1,7 @@
 import { type AssertResult, checkExpectations } from './asserts.js';
 import { type RunResult, runRequest } from './runner/exec.js';
 import type { TestFile } from './schema.js';
-import { captureAuthToken, maskSecrets } from './capture.js';
+import { captureAuthToken, captureValue, maskSecrets } from './capture.js';
 import { resolveVars, type VarSources } from './vars.js';
 
 export const EXIT = {
@@ -50,25 +50,32 @@ function resolvedTest(test: TestFile['tests'][number], sources: VarSources, runt
   return { ...resolveVars(rest, { ...sources, runtime: runtime ?? {} }), ...(capture ? { capture } : {}) };
 }
 
-/** Validate every reference before sending anything, reserving authToken for prior captures. */
+const captureNames = (tests: TestFile['tests']) => [...new Set(tests.flatMap((test) => Object.keys(test.capture ?? {})))];
+
+/**
+ * Validate every reference before sending anything. A captured name is reserved for the whole
+ * run: it has no value until the test that captures it, even if the system defines one.
+ */
 export function validateRunVariables(input: TestFile | TestFile[], sources: VarSources = EMPTY_SOURCES): void {
   const tests = [input].flat().flatMap((file) => file.tests);
-  const hasCapture = tests.some((test) => test.capture);
-  let available = false;
+  const names = captureNames(tests);
+  const available = new Set<string>();
   for (const test of tests) {
-    resolvedTest(test, sources, hasCapture ? { authToken: available ? '[runtime token]' : undefined } : sources.runtime);
-    if (test.capture) available = true;
+    const runtime = Object.fromEntries(names.map((name) => [name, available.has(name) ? '[captured]' : undefined]));
+    resolvedTest(test, sources, names.length > 0 ? runtime : sources.runtime);
+    for (const name of Object.keys(test.capture ?? {})) available.add(name);
   }
 }
 
 /**
- * Runs several files as one flow, in order: a token captured in one file is available to the
+ * Runs several files as one flow, in order: values captured in one file are available to the
  * next ones. Returns the outcomes of each file; a file the flow never reached has none.
  */
 export async function runTestFiles(files: TestFile[], curlBin: string, sources: VarSources = EMPTY_SOURCES): Promise<TestOutcome[][]> {
   validateRunVariables(files, sources);
   const secrets: string[] = [];
-  const runtime = files.some((file) => file.tests.some((test) => test.capture)) ? { authToken: undefined as string | undefined } : undefined;
+  const names = captureNames(files.flatMap((file) => file.tests));
+  const runtime: Record<string, string | undefined> | undefined = names.length > 0 ? Object.fromEntries(names.map((name) => [name, undefined])) : undefined;
   const perFile: TestOutcome[][] = files.map(() => []);
   flow: for (const [index, file] of files.entries()) {
     const outcomes = perFile[index]!;
@@ -76,20 +83,39 @@ export async function runTestFiles(files: TestFile[], curlBin: string, sources: 
       const test = resolvedTest(template, sources, runtime ?? sources.runtime);
       const result = await runRequest(curlBin, test.request);
       const asserts = result.error === null ? checkExpectations(test.expect, result) : [];
-      if (test.capture) {
-        let captured = false;
-        if (runtime) runtime.authToken = undefined;
-        if (result.error === null && asserts.every((assert) => assert.ok)) {
-          try {
-            const token = captureAuthToken(result, test.capture);
-            secrets.push(token); if (runtime) runtime.authToken = token; captured = true;
-          } catch { /* Report a failed prerequisite without exposing the authentication response. */ }
+      if (!test.capture || !runtime) { outcomes.push({ name: test.name, result, asserts }); continue; }
+
+      // A test that captures is a prerequisite of what follows: if it fails, the flow stops.
+      const ready = result.error === null && asserts.every((assert) => assert.ok);
+      const hidden = Object.hasOwn(test.capture, 'authToken');
+      const captures: AssertResult[] = [];
+      for (const [name, path] of Object.entries(test.capture)) {
+        runtime[name] = undefined;
+        if (name === 'authToken') {
+          let captured = false;
+          if (ready) {
+            try {
+              const token = captureAuthToken(result, { authToken: path });
+              secrets.push(token); runtime.authToken = token; captured = true;
+            } catch { /* Report a failed prerequisite without exposing the authentication response. */ }
+          }
+          captures.push({ ok: captured, label: 'authentication token captured', ...(!captured ? { message: 'Authentication or token capture failed; flow stopped; remaining requests were not executed' } : {}) });
+          continue;
         }
+        const label = `capture ${name} from ${path}`;
+        if (!ready) { captures.push({ ok: false, label, message: 'not captured: the request or its asserts failed; flow stopped' }); continue; }
+        try {
+          runtime[name] = captureValue(result, path);
+          captures.push({ ok: true, label });
+        } catch (error) {
+          captures.push({ ok: false, label, message: `${(error as Error).message}; flow stopped; remaining requests were not executed` });
+        }
+      }
+      if (hidden) {
         const safeAsserts = asserts.map((assert, index) => ({ ok: assert.ok, label: `authentication assertion ${index + 1}`, ...(!assert.ok ? { message: 'Authentication assertion failed; flow stopped' } : {}) }));
-        safeAsserts.push({ ok: captured, label: 'authentication token captured', ...(!captured ? { message: 'Authentication or token capture failed; flow stopped; remaining requests were not executed' } : {}) });
-        outcomes.push({ name: test.name, responseHidden: true, result: { ...result, headers: {}, body: '[authentication response hidden]', error: result.error === null ? null : 'Authentication request failed; flow stopped' }, asserts: safeAsserts });
-        if (!captured) break flow;
-      } else outcomes.push({ name: test.name, result, asserts });
+        outcomes.push({ name: test.name, responseHidden: true, result: { ...result, headers: {}, body: '[authentication response hidden]', error: result.error === null ? null : 'Authentication request failed; flow stopped' }, asserts: [...safeAsserts, ...captures] });
+      } else outcomes.push({ name: test.name, result, asserts: [...asserts, ...captures] });
+      if (!captures.every((capture) => capture.ok)) break flow;
     }
   }
   // Preserve structural field names even when a token is a short substring such as "a".

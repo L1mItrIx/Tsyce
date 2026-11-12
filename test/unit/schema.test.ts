@@ -3,10 +3,13 @@ import { expectSchema, testFileSchema } from '../../src/core/schema.js';
 
 const minimal = { version: 1, tests: [{ name: 't', request: { url: 'http://x' } }] };
 
-test('authentication capture is optional, strict and requires a valid JSONPath', () => {
-  expect(testFileSchema.safeParse({ ...minimal, tests: [{ ...minimal.tests[0], capture: { authToken: '$.access_token' } }] }).success).toBe(true);
-  for (const capture of [{}, { token: '$.token' }, { authToken: '$[' }, { authToken: 123 }]) {
-    expect(testFileSchema.safeParse({ ...minimal, tests: [{ ...minimal.tests[0], capture }] }).success).toBe(false);
+test('capture is optional and maps variable names to valid JSONPaths', () => {
+  const withCapture = (capture: unknown) => testFileSchema.safeParse({ ...minimal, tests: [{ ...minimal.tests[0], capture }] }).success;
+  for (const capture of [{ authToken: '$.access_token' }, { userId: '$.id' }, { authToken: '$.token', 'order.id': '$.orders[0].id', _x: '$.x' }]) {
+    expect(withCapture(capture)).toBe(true);
+  }
+  for (const capture of [{}, { authToken: '$[' }, { authToken: 123 }, { 'user id': '$.id' }, { '1st': '$.id' }, { '{{x}}': '$.id' }, ['$.id']]) {
+    expect(withCapture(capture)).toBe(false);
   }
 });
 
