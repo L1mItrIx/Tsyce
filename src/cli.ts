@@ -18,7 +18,7 @@ import {
 import { type Dialect, DIALECTS, tokenizeCurl } from './core/importer/detect-dialect.js';
 import { CurlImportError, extractSecrets, mapFlags } from './core/importer/map-flags.js';
 import { ShellSyntaxError } from './core/importer/tokenize-bash.js';
-import { expandRun, findProjectFile, PROJECT_FILE_NAME, projectEnvironment, readLocalValues, readProjectFile } from './core/project.js';
+import { expandRun, findProjectFile, initProject, PROJECT_FILE_NAME, projectEnvironment, readLocalValues, readProjectFile } from './core/project.js';
 import { formatPretty, formatPrettyProject } from './core/reporter/pretty.js';
 import { formatJUnit, formatJUnitSuites } from './core/reporter/junit.js';
 import { readDataFile, readTestRows } from './core/data.js';
@@ -105,6 +105,12 @@ async function runCommand(path: string | undefined, options: RunOptions): Promis
     throw new TestFileError(`no ${PROJECT_FILE_NAME} found in this directory or its parents; pass a test file: httpi run <file>`);
   }
   return runProjectCommand(resolve(projectPath), options);
+}
+
+async function initCommand(directory: string): Promise<ExitCode> {
+  for (const step of await initProject(directory)) say(`${step.action.padEnd(7)} ${step.path}`);
+  say('httpi: project ready. Set baseUrl in httpi.yaml, add tests with "httpi new tests/<name>.yaml" or "httpi import", then run "httpi run".');
+  return EXIT.ok;
 }
 
 type ImportOptions = { dialect?: Dialect; output?: string; name?: string; keepSecrets?: true };
@@ -217,6 +223,12 @@ program
   .option('--env <name>', 'environment from httpi.yaml or httpi.env.yaml')
   .option('--var <name=value>', 'set a variable; repeatable, wins over the environment', collectVar, {})
   .action((path: string | undefined, options: RunOptions) => finish(runCommand(path, options)));
+
+program
+  .command('init')
+  .description('lay out a project: httpi.yaml, tests/, data/, a CI workflow and .gitignore entries (never replaces files)')
+  .argument('[directory]', 'where to create the project', '.')
+  .action((directory: string) => finish(initCommand(directory)));
 
 program
   .command('import')

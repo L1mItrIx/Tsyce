@@ -83,7 +83,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 ### V4 — Colaboración por git
 - [x] V4.1 Rutas de `body.form` (`@ruta`) y de `data` relativas al YAML que las declara
 - [x] V4.2 `httpi.local.yaml` y su precedencia
-- [ ] V4.3 `httpi init`
+- [x] V4.3 `httpi init`
 - [ ] V4.4 `httpi validate`
 
 ### V5 — OAuth 2.0
@@ -168,6 +168,7 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-12 — V3.2: `data` en un test (ruta relativa al archivo de prueba) lo repite por fila con el sufijo ` [row N]`; `data` en una entrada de `run:` (relativa a `httpi.yaml`) repite el archivo entero y cada fila es una suite `título [row N]`. `{{data.columna}}` solo lee la fila actual (nunca `--var` ni el sistema). Las filas se validan todas antes de enviar. `httpi export` y MCP rechazan tests con `data` en vez de ejecutarlos una sola vez.
 - 2026-11-12 — V4.1: cambio de comportamiento: en `httpi run`, las rutas relativas de `body.form` (`campo=@ruta`, `campo=<ruta`, varias con coma, con `;type=`) se resuelven contra la carpeta del YAML, después de sustituir variables; antes eran relativas al directorio actual. Rutas absolutas y `@-` no cambian. `httpi export` y el asistente `httpi new` siguen usando la ruta tal como está escrita.
 - 2026-11-12 — V4.2: `httpi.local.yaml` es un mapa plano `nombre: valor` junto a `httpi.yaml`, sin entornos; se lee solo en corridas de proyecto (no en `httpi run <archivo>`). Precedencia de `{{nombre}}`: capturas > `--var` > sistema > local > entorno. `${NOMBRE}` sigue leyendo solo el sistema.
+- 2026-11-12 — V4.3: `httpi init [directorio]` crea `httpi.yaml` (entorno `dev`, `run: tests/*.yaml`, `report.junit`), `tests/example.yaml`, `data/.gitkeep`, `.github/workflows/httpi.yml` y añade a `.gitignore` `.httpi/`, `httpi.local.yaml` y `reports/` (este último no estaba en el plan; evita versionar reportes generados). No reemplaza archivos; si ya hay `httpi.yaml` sale con 2. El workflow generado es propio (no copia `examples/github-actions.yml`, que compila este repositorio) y usa `npx httpi-cli run`: no funcionará hasta publicar el paquete en npm (F7.4).
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.

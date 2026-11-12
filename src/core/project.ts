@@ -1,8 +1,9 @@
 import { existsSync } from 'node:fs';
-import { glob } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { glob, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { basename, dirname, join, resolve } from 'node:path';
 import { ENV_FILE_NAME, parseWith, readEnvironment, readTextFile, TestFileError } from './file.js';
 import { localFileSchema, type ProjectFile, projectFileSchema } from './schema.js';
+import { stringify } from 'yaml';
 
 export const PROJECT_FILE_NAME = 'httpi.yaml';
 export const LOCAL_FILE_NAME = 'httpi.local.yaml';
@@ -83,4 +84,85 @@ export async function readLocalValues(projectPath: string): Promise<Record<strin
   if (!existsSync(path)) return {};
   // An empty file is a valid YAML document without content.
   return parseWith(localFileSchema.nullable(), await readTextFile(path), path, 'local values file') ?? {};
+}
+
+/** Paths `httpi init` keeps out of git: local tokens, personal values and generated reports. */
+const IGNORED = ['.httpi/', LOCAL_FILE_NAME, 'reports/'];
+
+const WORKFLOW = `name: API tests
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Secrets reach the tests as environment variables: use them as \${NAME} in httpi.yaml.
+      - run: npx --yes httpi-cli run
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-test-results
+          path: reports/junit.xml
+`;
+
+const EXAMPLE_TEST = `version: 1
+name: Example
+tests:
+  - name: the API answers
+    request:
+      url: '{{baseUrl}}/'
+    expect:
+      status: 200
+`;
+
+export type InitStep = { path: string; action: 'created' | 'updated' | 'kept' };
+
+/**
+ * Lays out a project in `dir`: httpi.yaml, a first test, tests/ and data/, a CI workflow and the
+ * .gitignore entries. Existing files are never replaced; an existing httpi.yaml is an error.
+ */
+export async function initProject(dir: string): Promise<InitStep[]> {
+  const root = resolve(dir);
+  if (existsSync(join(root, PROJECT_FILE_NAME))) {
+    throw new TestFileError(`${join(root, PROJECT_FILE_NAME)}: the project already exists; nothing was changed`);
+  }
+  const project: ProjectFile = {
+    version: 1,
+    name: basename(root),
+    env: { default: 'dev', environments: { dev: { baseUrl: 'http://localhost:3000' } } },
+    run: ['tests/*.yaml'],
+    report: { junit: 'reports/junit.xml' },
+  };
+  const files: Array<[path: string, content: string]> = [
+    [PROJECT_FILE_NAME, stringify(project, { lineWidth: 0 })],
+    ['tests/example.yaml', EXAMPLE_TEST],
+    ['data/.gitkeep', ''],
+    ['.github/workflows/httpi.yml', WORKFLOW],
+  ];
+  const steps: InitStep[] = [];
+  for (const [path, content] of files) {
+    const full = join(root, path);
+    if (existsSync(full)) { steps.push({ path, action: 'kept' }); continue; }
+    await mkdir(dirname(full), { recursive: true });
+    await writeFile(full, content, { flag: 'wx' });
+    steps.push({ path, action: 'created' });
+  }
+
+  const gitignore = join(root, '.gitignore');
+  const current = existsSync(gitignore) ? await readFile(gitignore, 'utf8') : null;
+  const present = new Set((current ?? '').split(/\r?\n/).map((line) => line.trim()));
+  const missing = IGNORED.filter((entry) => !present.has(entry));
+  if (missing.length > 0) {
+    const separator = current === null || current === '' || current.endsWith('\n') ? '' : '\n';
+    await writeFile(gitignore, `${current ?? ''}${separator}${missing.join('\n')}\n`);
+  }
+  steps.push({ path: '.gitignore', action: current === null ? 'created' : missing.length > 0 ? 'updated' : 'kept' });
+  return steps;
 }
