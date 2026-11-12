@@ -22,7 +22,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 - [x] F2.4 `httpi run <archivo>` + tests e2e de códigos de salida
 
 ## Fase 3 — Variables y entornos
-- [ ] F3.1 `vars.ts`: `{{var}}`, `${ENV}`, precedencia
+- [x] F3.1 `vars.ts`: `{{var}}`, `${ENV}`, precedencia
 - [ ] F3.2 `httpi.env.yaml`, `--env`, `--var`; variable sin resolver → salida 2
 
 ## Fase 4 — Importador de curl
@@ -64,6 +64,7 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-12 — F2.2: si un `path` coincide con varios nodos, el comparador debe cumplirse en todos (y debe haber al menos uno); `equals` no convierte tipos; en headers basta con que un valor del header coincida; un `path` que no compila como JSONPath es error de archivo (salida 2), no assert fallido.
 - 2026-11-12 — F2.3: archivo nuevo `src/core/run.ts` (no está en el mapa de PLAN §9): tipo `TestOutcome`, códigos de salida y, desde F2.4, el bucle que ejecuta un archivo. Si hay a la vez error de red y assert fallido, gana la salida 3. El reporter muestra todos los asserts, no solo los fallidos.
 - 2026-11-12 — F2.4: `check` ahora es typecheck → build → tests, porque los e2e ejecutan `dist/cli.js`. Los errores de uso de commander salen con 2 (no 1). `httpi run` recibe un solo archivo; el reporte va a stdout y los errores a stderr; color solo en TTY y sin `NO_COLOR`.
+- 2026-11-12 — F3.1: `{{nombre}}` busca en `--var`, luego en el entorno del sistema y luego en `httpi.env.yaml`; `${NOMBRE}` solo lee el entorno del sistema. Se sustituye en cualquier valor de texto del test (también en `expect`), nunca en claves; los valores no se vuelven a expandir.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.
@@ -72,6 +73,7 @@ Ideas que surgieron y no se hicieron. No implementar sin aprobación.
 - Cuerpos de respuesta binarios: `RunResult.body` es texto UTF-8.
 - `httpi run` con varios archivos o un directorio.
 - `httpi --version`.
+- Escape para escribir `{{` o `${` literales en un test.
 
 ## Bloqueos
 Qué impide avanzar y qué se necesita del usuario.
