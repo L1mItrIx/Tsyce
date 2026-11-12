@@ -77,7 +77,7 @@ describe('readProjectFile', () => {
 
 describe('expandRun', () => {
   const expand = (run: unknown[]) => expandRun(projectFileSchema.parse({ version: 1, run }), join(root, 'httpi.yaml'));
-  const abs = (...files: string[]) => files.map((file) => join(root, ...file.split('/')));
+  const abs = (...files: string[]) => files.map((file) => ({ file: join(root, ...file.split('/')) }));
 
   test('keeps the order of the list and sorts the matches of a pattern', async () => {
     expect(await expand(['tests/users.yaml', 'tests/admin/*.yaml', { file: 'tests/login.yaml' }])).toEqual(
@@ -89,6 +89,15 @@ describe('expandRun', () => {
     expect(await expand(['tests/**/*.yaml'])).toEqual(
       abs('tests/admin/a.yaml', 'tests/admin/b.yaml', 'tests/login.yaml', 'tests/users.yaml'),
     );
+  });
+
+  test('data of a run entry is resolved against the project and applies to every match of a pattern', async () => {
+    const data = join(root, 'data', 'users.csv');
+    expect(await expand([{ file: 'tests/admin/*.yaml', data: 'data/users.csv' }, 'tests/login.yaml'])).toEqual([
+      { file: join(root, 'tests', 'admin', 'a.yaml'), data },
+      { file: join(root, 'tests', 'admin', 'b.yaml'), data },
+      { file: join(root, 'tests', 'login.yaml') },
+    ]);
   });
 
   test('a file listed twice runs twice', async () => {

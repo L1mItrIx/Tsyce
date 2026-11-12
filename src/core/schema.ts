@@ -83,6 +83,8 @@ export const testSchema = z.strictObject({
   request: requestSchema,
   expect: expectSchema.default({}),
   capture: captureSchema.optional(),
+  /** CSV or JSON file, relative to this file: the test runs once per row, with `{{data.<column>}}`. */
+  data: z.string().min(1).optional(),
 });
 
 export const testFileSchema = z.strictObject({
@@ -108,9 +110,17 @@ export type EnvFile = z.infer<typeof envFileSchema>;
 const projectPath = z.string().min(1);
 
 /** One entry of `run:` — a test file, or a pattern such as `tests/admin/*.yaml`. */
-export const runEntrySchema = z.union([projectPath, z.strictObject({ file: projectPath })], {
-  error: 'run entry must be a path, a pattern or { file }',
-});
+export const runEntrySchema = z.union(
+  [
+    projectPath,
+    z.strictObject({
+      file: projectPath,
+      /** CSV or JSON file, relative to httpi.yaml: the whole file runs once per row. */
+      data: projectPath.optional(),
+    }),
+  ],
+  { error: 'run entry must be a path, a pattern or { file, data }' },
+);
 
 /** httpi.yaml: the whole project in one file, so that CI only needs `httpi run`. */
 export const projectFileSchema = z.strictObject({

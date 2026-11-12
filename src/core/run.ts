@@ -1,5 +1,6 @@
 import { type AssertResult, checkExpectations } from './asserts.js';
 import { type RunResult, runRequest } from './runner/exec.js';
+import type { DataRow } from './data.js';
 import type { TestFile } from './schema.js';
 import { captureAuthToken, captureValue, maskSecrets } from './capture.js';
 import { resolveVars, type VarSources } from './vars.js';
@@ -45,25 +46,52 @@ export function exitCodeFor(outcomes: TestOutcome[]): ExitCode {
 
 const EMPTY_SOURCES: VarSources = { cli: {}, system: {}, file: {} };
 
-function resolvedTest(test: TestFile['tests'][number], sources: VarSources, runtime: VarSources['runtime']) {
-  const { capture, ...rest } = test;
-  return { ...resolveVars(rest, { ...sources, runtime: runtime ?? {} }), ...(capture ? { capture } : {}) };
+/** A test file ready to run, with the rows of the data files it uses already read. */
+export type RunItem = {
+  file: TestFile;
+  /** Row of the data file given in `run:`; every test of the file sees it. */
+  row?: DataRow;
+  /** Per test, the rows of its own `data` file (see readTestRows). */
+  testRows?: Array<DataRow[] | undefined>;
+};
+
+type TestRun = { template: TestFile['tests'][number]; data: DataRow | undefined; suffix: string };
+
+/** Every request an item sends, in order: one per test, or one per row for a test with `data`. */
+function testRuns(item: RunItem): TestRun[] {
+  return item.file.tests.flatMap((template, index): TestRun[] => {
+    const rows = item.testRows?.[index];
+    if (template.data !== undefined && rows === undefined) {
+      throw new Error(`test "${template.name}" declares data but its rows were not loaded`);
+    }
+    if (rows === undefined) return [{ template, data: item.row, suffix: '' }];
+    return rows.map((row, rowIndex) => ({ template, data: { ...item.row, ...row }, suffix: ` [row ${rowIndex + 1}]` }));
+  });
 }
 
-const captureNames = (tests: TestFile['tests']) => [...new Set(tests.flatMap((test) => Object.keys(test.capture ?? {})))];
+function resolvedTest(run: TestRun, sources: VarSources, runtime: VarSources['runtime']) {
+  const { capture, data: _dataFile, ...rest } = run.template;
+  const resolved = resolveVars(rest, { ...sources, runtime: runtime ?? {}, ...(run.data !== undefined && { data: run.data }) });
+  return { ...resolved, name: `${resolved.name}${run.suffix}`, ...(capture ? { capture } : {}) };
+}
+
+const toItems = (input: TestFile | Array<TestFile | RunItem>): RunItem[] =>
+  [input].flat().map((entry) => ('file' in entry ? entry : { file: entry }));
+
+const captureNames = (items: RunItem[]) => [...new Set(items.flatMap((item) => item.file.tests.flatMap((test) => Object.keys(test.capture ?? {}))))];
 
 /**
- * Validate every reference before sending anything. A captured name is reserved for the whole
- * run: it has no value until the test that captures it, even if the system defines one.
+ * Validate every reference before sending anything, row by row. A captured name is reserved for
+ * the whole run: it has no value until the test that captures it, even if the system defines one.
  */
-export function validateRunVariables(input: TestFile | TestFile[], sources: VarSources = EMPTY_SOURCES): void {
-  const tests = [input].flat().flatMap((file) => file.tests);
-  const names = captureNames(tests);
+export function validateRunVariables(input: TestFile | Array<TestFile | RunItem>, sources: VarSources = EMPTY_SOURCES): void {
+  const items = toItems(input);
+  const names = captureNames(items);
   const available = new Set<string>();
-  for (const test of tests) {
+  for (const run of items.flatMap(testRuns)) {
     const runtime = Object.fromEntries(names.map((name) => [name, available.has(name) ? '[captured]' : undefined]));
-    resolvedTest(test, sources, names.length > 0 ? runtime : sources.runtime);
-    for (const name of Object.keys(test.capture ?? {})) available.add(name);
+    resolvedTest(run, sources, names.length > 0 ? runtime : sources.runtime);
+    for (const name of Object.keys(run.template.capture ?? {})) available.add(name);
   }
 }
 
@@ -71,16 +99,17 @@ export function validateRunVariables(input: TestFile | TestFile[], sources: VarS
  * Runs several files as one flow, in order: values captured in one file are available to the
  * next ones. Returns the outcomes of each file; a file the flow never reached has none.
  */
-export async function runTestFiles(files: TestFile[], curlBin: string, sources: VarSources = EMPTY_SOURCES): Promise<TestOutcome[][]> {
-  validateRunVariables(files, sources);
+export async function runTestFiles(input: Array<TestFile | RunItem>, curlBin: string, sources: VarSources = EMPTY_SOURCES): Promise<TestOutcome[][]> {
+  const items = toItems(input);
+  validateRunVariables(items, sources);
   const secrets: string[] = [];
-  const names = captureNames(files.flatMap((file) => file.tests));
+  const names = captureNames(items);
   const runtime: Record<string, string | undefined> | undefined = names.length > 0 ? Object.fromEntries(names.map((name) => [name, undefined])) : undefined;
-  const perFile: TestOutcome[][] = files.map(() => []);
-  flow: for (const [index, file] of files.entries()) {
+  const perFile: TestOutcome[][] = items.map(() => []);
+  flow: for (const [index, item] of items.entries()) {
     const outcomes = perFile[index]!;
-    for (const template of file.tests) {
-      const test = resolvedTest(template, sources, runtime ?? sources.runtime);
+    for (const run of testRuns(item)) {
+      const test = resolvedTest(run, sources, runtime ?? sources.runtime);
       const result = await runRequest(curlBin, test.request);
       const asserts = result.error === null ? checkExpectations(test.expect, result) : [];
       if (!test.capture || !runtime) { outcomes.push({ name: test.name, result, asserts }); continue; }

@@ -85,6 +85,7 @@ export async function createToolHandler(options: McpOptions) {
       const environment = join(dirname(path), ENV_FILE_NAME);
       if (!within(await realpath(environment))) throw new Error('Environment file must stay inside the configured root');
     }
+    if (file.tests.some((test) => test.data !== undefined)) throw new Error('Tests that repeat over a data file are not supported through MCP yet; use the CLI');
     const sources = { cli: run.variables, system: process.env, file: run.env === undefined ? {} : await readEnvironment(path, run.env) };
     validateRunVariables(file, sources);
     // A captured value is only known at run time, so it must not decide where a request goes.

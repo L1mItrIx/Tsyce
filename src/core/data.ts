@@ -1,5 +1,6 @@
-import { extname } from 'node:path';
+import { dirname, extname, resolve } from 'node:path';
 import { readTextFile, TestFileError } from './file.js';
+import type { TestFile } from './schema.js';
 
 /** One row of a data file: column name → value, always as text. */
 export type DataRow = Record<string, string>;
@@ -119,4 +120,10 @@ export async function readDataFile(path: string): Promise<DataRow[]> {
   }
   const text = await readTextFile(path);
   return extension === '.csv' ? parseCsv(text, path) : parseJsonRows(text, path);
+}
+
+/** The rows of each test that declares `data` (paths are relative to the test file); undefined for the others. */
+export function readTestRows(file: TestFile, filePath: string): Promise<Array<DataRow[] | undefined>> {
+  const root = dirname(resolve(filePath));
+  return Promise.all(file.tests.map((test) => (test.data === undefined ? undefined : readDataFile(resolve(root, test.data)))));
 }

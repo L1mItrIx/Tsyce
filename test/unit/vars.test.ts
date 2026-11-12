@@ -89,3 +89,17 @@ describe('unresolved variables', () => {
     expect(() => resolveVars('{{token}}', sources())).toThrow('unresolved variable: {{token}}');
   });
 });
+
+describe('data rows', () => {
+  const row = { cli: { 'data.name': 'from --var' }, system: { 'data.name': 'from system' }, file: { name: 'from file' }, data: { name: 'Ana', 'user.id': '7' } };
+
+  test('{{data.<column>}} reads the current row and nothing else', () => {
+    expect(resolveVars('{{data.name}} / {{ data.user.id }} / {{name}}', row)).toBe('Ana / 7 / from file');
+  });
+
+  test('a column the row does not have is unresolved, even if another source defines that name', () => {
+    expect(() => resolveVars('{{data.email}}', row)).toThrow('unresolved variable: {{data.email}}');
+    expect(() => resolveVars('{{data.name}}', { ...row, data: {} })).toThrow(UnresolvedVariableError);
+    expect(() => resolveVars('{{data.name}}', sources({ cli: { 'data.name': 'x' } }))).toThrow(UnresolvedVariableError);
+  });
+});

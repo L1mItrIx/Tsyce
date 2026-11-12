@@ -21,7 +21,8 @@ import { ShellSyntaxError } from './core/importer/tokenize-bash.js';
 import { expandRun, findProjectFile, PROJECT_FILE_NAME, projectEnvironment, readProjectFile } from './core/project.js';
 import { formatPretty, formatPrettyProject } from './core/reporter/pretty.js';
 import { formatJUnit, formatJUnitSuites } from './core/reporter/junit.js';
-import { EXIT, type ExitCode, exitCodeFor, runTestFile, runTestFiles, validateRunVariables } from './core/run.js';
+import { readDataFile, readTestRows } from './core/data.js';
+import { EXIT, type ExitCode, exitCodeFor, type RunItem, runTestFiles, validateRunVariables } from './core/run.js';
 import { detectCurl } from './core/runner/detect.js';
 import { CurlUnavailableError, runRequest } from './core/runner/exec.js';
 import type { TestFile } from './core/schema.js';
@@ -45,15 +46,16 @@ const prettyOptions = (options: RunOptions) => ({
 
 async function runFileCommand(path: string, options: RunOptions): Promise<ExitCode> {
   const file = await readTestFile(path);
+  const item = { file, testRows: await readTestRows(file, path) };
   const sources = {
     cli: options.var,
     system: process.env,
     file: options.env === undefined ? {} : await readEnvironment(path, options.env),
   };
-  validateRunVariables(file, sources);
+  validateRunVariables([item], sources);
   const title = resolveVars(file.name, sources);
   const curl = await detectCurl();
-  const outcomes = await runTestFile(file, curl.bin, sources);
+  const [outcomes = []] = await runTestFiles([item], curl.bin, sources);
   const report = options.reporter === 'junit' ? formatJUnit(title, outcomes) : formatPretty(title, outcomes, prettyOptions(options));
   process.stdout.write(`${report}\n`);
   return exitCodeFor(outcomes);
@@ -66,15 +68,19 @@ async function runProjectCommand(projectPath: string, options: RunOptions): Prom
   for (const warning of environment.warnings) say(`warning: ${warning}`);
   const sources = { cli: options.var, system: process.env, file: environment.variables };
 
-  const paths = await expandRun(project, projectPath);
-  const files = await Promise.all(paths.map((path) => readTestFile(path)));
-  validateRunVariables(files, sources);
+  // One item per file, or one per row when the run entry repeats the file over a data file.
+  const items: Array<RunItem & { title: string }> = [];
+  for (const target of await expandRun(project, projectPath)) {
+    const file = await readTestFile(target.file);
+    const testRows = await readTestRows(file, target.file);
+    const title = resolveVars(file.name, sources) ?? relative(dirname(projectPath), target.file).replaceAll('\\', '/');
+    if (target.data === undefined) items.push({ file, testRows, title });
+    else for (const [index, row] of (await readDataFile(target.data)).entries()) items.push({ file, testRows, row, title: `${title} [row ${index + 1}]` });
+  }
+  validateRunVariables(items, sources);
   const curl = await detectCurl();
-  const perFile = await runTestFiles(files, curl.bin, sources);
-  const suites = files.map((file, index) => ({
-    name: resolveVars(file.name, sources) ?? relative(dirname(projectPath), paths[index]!).replaceAll('\\', '/'),
-    outcomes: perFile[index]!,
-  }));
+  const perFile = await runTestFiles(items, curl.bin, sources);
+  const suites = items.map((item, index) => ({ name: item.title, outcomes: perFile[index]! }));
   const report = options.reporter === 'junit' ? formatJUnitSuites(suites) : formatPrettyProject(suites, prettyOptions(options));
   process.stdout.write(`${report}\n`);
   if (project.report?.junit !== undefined) {
@@ -150,6 +156,7 @@ async function newCommand(path: string, options: { name?: string }): Promise<Exi
 async function exportCommand(path: string, options: ExportOptions): Promise<ExitCode> {
   const input = await readTestFile(path);
   if (input.tests.some((test) => test.capture)) throw new TestFileError('Authentication capture flows must be executed with httpi run; static curl export cannot reproduce token captures');
+  if (input.tests.some((test) => test.data !== undefined)) throw new TestFileError('Tests that repeat over a data file must be executed with httpi run; static curl export does not expand the rows');
   const file = resolveVars(input, {
     cli: options.var,
     system: process.env,

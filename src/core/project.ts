@@ -24,27 +24,31 @@ export async function readProjectFile(path: string): Promise<ProjectFile> {
 
 const isPattern = (path: string) => /[*?[\]{}]/.test(path);
 
+/** A test file to run and, when its `run:` entry has `data`, the data file to repeat it over. */
+export type RunTarget = { file: string; data?: string };
+
 /**
  * The test files of `run:` as absolute paths, in the order they must run: entries keep their
  * order, and the matches of a pattern are sorted by name. Paths are relative to the project file.
  */
-export async function expandRun(project: ProjectFile, projectPath: string): Promise<string[]> {
+export async function expandRun(project: ProjectFile, projectPath: string): Promise<RunTarget[]> {
   const root = dirname(resolve(projectPath));
-  const files: string[] = [];
+  const targets: RunTarget[] = [];
   for (const entry of project.run) {
-    const file = typeof entry === 'string' ? entry : entry.file;
+    const { file, data } = typeof entry === 'string' ? { file: entry } : entry;
+    const withData = (path: string): RunTarget => ({ file: path, ...(data !== undefined && { data: resolve(root, data) }) });
     if (!isPattern(file)) {
       const path = resolve(root, file);
       if (!existsSync(path)) throw new TestFileError(`${projectPath}: run entry "${file}" does not exist`);
-      files.push(path);
+      targets.push(withData(path));
       continue;
     }
     const matches: string[] = [];
     for await (const match of glob(file, { cwd: root })) matches.push(resolve(root, match));
     if (matches.length === 0) throw new TestFileError(`${projectPath}: run pattern "${file}" matches no files`);
-    files.push(...matches.sort());
+    targets.push(...matches.sort().map(withData));
   }
-  return files;
+  return targets;
 }
 
 /**
