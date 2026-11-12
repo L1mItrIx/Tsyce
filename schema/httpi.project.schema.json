@@ -146,6 +146,63 @@
               "refreshToken"
             ],
             "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "oauth2"
+              },
+              "tokenUrl": {
+                "type": "string",
+                "minLength": 1
+              },
+              "clientId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "scopes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "clientAuth": {
+                "type": "string",
+                "enum": [
+                  "basic",
+                  "body"
+                ]
+              },
+              "flow": {
+                "type": "string",
+                "const": "authorization_code"
+              },
+              "authorizationUrl": {
+                "type": "string",
+                "minLength": 1
+              },
+              "clientSecret": {
+                "type": "string",
+                "minLength": 1
+              },
+              "redirectPort": {
+                "default": 8787,
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              }
+            },
+            "required": [
+              "type",
+              "tokenUrl",
+              "clientId",
+              "flow",
+              "authorizationUrl"
+            ],
+            "additionalProperties": false
           }
         ]
       }

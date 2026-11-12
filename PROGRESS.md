@@ -89,7 +89,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 ### V5 — OAuth 2.0
 - [x] V5.1 `authSchema`, `request.auth` y flujo `client_credentials`
 - [x] V5.2 Flujo `refresh_token`
-- [ ] V5.3 `authorization_code` + PKCE, `token-store`, `httpi auth login|status`
+- [x] V5.3 `authorization_code` + PKCE, `token-store`, `httpi auth login|status`
 - [ ] V5.4 Asistente `httpi auth add`
 
 ### V6 — Importar Postman
@@ -172,6 +172,7 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-12 — V4.4: `httpi validate` (solo proyecto) no envía requests y lista todos los problemas por stdout: esquema de cada archivo, archivos de datos, archivos de multipart inexistentes, credenciales literales en `Authorization`/`Cookie` (sin mostrar el valor) y variables sin resolver; sale 0 o 2. Las referencias `${NOMBRE}` no cuentan como problema porque los secretos de CI no existen donde se valida; `{{nombre}}` sí debe resolverse con `--var`, sistema, `httpi.local.yaml`, el entorno, capturas o datos. `validateRunVariables` ahora reúne las variables sin resolver de toda la corrida en un solo error (antes paraba en el primer test).
 - 2026-11-12 — V5.1: `auth` en `httpi.yaml` (nombre → bloque `oauth2`) y `request.auth: <nombre>` en los tests. En una corrida de proyecto se pide un token por cada nombre usado, una sola vez y antes de la primera prueba; se envía como `Authorization: Bearer` y se redacta en los reportes. El cliente se identifica con HTTP Basic por defecto o con `clientAuth: body`. Si el endpoint de tokens falla o no responde, la corrida no empieza y sale con 3 (solo se muestran `error` y `error_description`, nunca el cuerpo). Nombre de `auth` inexistente, o `auth` junto a un header `Authorization`, salen con 2. `auth` solo funciona en corridas de proyecto: `httpi run <archivo>`, `httpi export` y MCP lo rechazan.
 - 2026-11-12 — V5.2: `flow: refresh_token` canjea `refreshToken` (pensado para `${VAR}`) al inicio de cada corrida. Sin `clientSecret` se trata como cliente público (solo `client_id` en el body). Limitación: si el servidor rota el refresh token en cada canje, httpi no guarda el nuevo; ese caso necesita `authorization_code` en local (V5.3) o un refresh token no rotatorio en CI.
+- 2026-11-12 — V5.3: `flow: authorization_code` con PKCE (S256) y `state`; callback en `http://127.0.0.1:<redirectPort>/callback` (por defecto 8787; hay que registrarlo en el proveedor). `httpi auth login <nombre>` imprime la URL y abre el navegador (`open`/`xdg-open`/`rundll32`, sin shell; `HTTPI_NO_BROWSER=1` lo evita), espera hasta 5 minutos y guarda el resultado en `.httpi/tokens.json` (permisos 600 donde aplican) junto a `httpi.yaml`. `httpi run` usa el token guardado hasta 30 s antes de caducar; si caducó lo renueva con el refresh token y guarda el nuevo (también si el servidor lo rota). Sin sesión, sesión caducada sin refresh token o proveedor que rechaza → salida 3 con el comando a ejecutar. `httpi auth status` lista los bloques sin mostrar tokens. Sin verificar: el login con un navegador real y un proveedor real; en los tests el "navegador" es una petición al callback contra un proveedor falso.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.

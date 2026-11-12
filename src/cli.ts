@@ -4,7 +4,10 @@ import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, relative, resolve } from 'node:path';
 import { Command, InvalidArgumentError, Option } from 'commander';
+import { spawn } from 'node:child_process';
+import { loginWithBrowser } from './core/auth/login.js';
 import { AuthError, authNamesUsed, checkAuthReferences, obtainTokens } from './core/auth/oauth.js';
+import { isUsable, readStoredTokens, saveStoredToken, tokenStorePath } from './core/auth/token-store.js';
 import { CurlExportError, exportCurl } from './core/exporter/curl.js';
 import {
   defaultTestName,
@@ -85,7 +88,7 @@ async function runProjectCommand(projectPath: string, options: RunOptions): Prom
   const authProblems = files.flatMap((file) => checkAuthReferences(file, project.auth));
   if (authProblems.length > 0) throw new TestFileError(authProblems.join('\n'));
   const curl = await detectCurl();
-  const tokens = await obtainTokens(authNamesUsed(files), project.auth ?? {}, sources, curl.bin);
+  const tokens = await obtainTokens(authNamesUsed(files), project.auth ?? {}, sources, curl.bin, tokenStorePath(projectPath));
   const perFile = await runTestFiles(items, curl.bin, sources, tokens);
   const suites = items.map((item, index) => ({ name: item.title, outcomes: perFile[index]! }));
   const report = options.reporter === 'junit' ? formatJUnitSuites(suites) : formatPrettyProject(suites, prettyOptions(options));
@@ -124,6 +127,64 @@ async function validateCommand(options: VariableOptions): Promise<ExitCode> {
   const size = `${files} ${files === 1 ? 'file' : 'files'}, ${tests} ${tests === 1 ? 'test' : 'tests'}`;
   process.stdout.write(problems.length === 0 ? `valid: ${size}; no requests were sent\n` : `${problems.length} ${problems.length === 1 ? 'problem' : 'problems'} in ${size}\n`);
   return problems.length === 0 ? EXIT.ok : EXIT.invalid;
+}
+
+/** Opens the default browser; the URL is always printed too, for machines without one. */
+function openBrowser(url: string): void {
+  if (process.env.HTTPI_NO_BROWSER) return;
+  const [command, args] =
+    process.platform === 'darwin' ? ['open', [url]]
+    : process.platform === 'win32' ? ['rundll32', ['url.dll,FileProtocolHandler', url]]
+    : ['xdg-open', [url]];
+  spawn(command, args, { stdio: 'ignore', detached: true }).on('error', () => { /* the printed URL is the fallback */ }).unref();
+}
+
+async function projectSources(projectPath: string, options: VariableOptions) {
+  const project = await readProjectFile(projectPath);
+  const environment = await projectEnvironment(project, projectPath, options.env);
+  return { project, sources: { cli: options.var, system: process.env, local: await readLocalValues(projectPath), file: environment.variables } };
+}
+
+async function authLoginCommand(name: string, options: VariableOptions): Promise<ExitCode> {
+  const projectPath = requireProject(undefined);
+  const { project, sources } = await projectSources(projectPath, options);
+  const block = project.auth?.[name];
+  if (block === undefined) {
+    throw new TestFileError(`auth "${name}" is not declared in ${PROJECT_FILE_NAME}; available: ${Object.keys(project.auth ?? {}).join(', ') || '(none)'}`);
+  }
+  if (block.flow !== 'authorization_code') {
+    throw new TestFileError(`auth "${name}" uses ${block.flow}: it needs no login, httpi run obtains its token by itself`);
+  }
+  const curl = await detectCurl();
+  const token = await loginWithBrowser(name, resolveVars(block, sources), {
+    curlBin: curl.bin,
+    announce: (url) => {
+      say(`Open this URL in a browser to log in:\n${url}`);
+      openBrowser(url);
+    },
+  });
+  await saveStoredToken(tokenStorePath(projectPath), name, token);
+  say(`httpi: logged in as "${name}"; the token is stored in .httpi/tokens.json (keep that directory out of git)`);
+  return EXIT.ok;
+}
+
+async function authStatusCommand(): Promise<ExitCode> {
+  const projectPath = requireProject(undefined);
+  const project = await readProjectFile(projectPath);
+  const stored = await readStoredTokens(tokenStorePath(projectPath));
+  const blocks = Object.entries(project.auth ?? {});
+  if (blocks.length === 0) process.stdout.write(`no auth blocks in ${PROJECT_FILE_NAME}\n`);
+  for (const [name, block] of blocks) {
+    const token = stored[name];
+    const state =
+      block.flow !== 'authorization_code' ? 'token requested on every run'
+      : token === undefined ? `not logged in; run "httpi auth login ${name}"`
+      : isUsable(token) ? `logged in${token.expiresAt === undefined ? '' : ` until ${new Date(token.expiresAt).toISOString()}`}`
+      : token.refreshToken !== undefined ? 'expired; it will be renewed on the next run'
+      : `expired; run "httpi auth login ${name}"`;
+    process.stdout.write(`${name}: ${block.flow}, ${state}\n`);
+  }
+  return EXIT.ok;
 }
 
 async function initCommand(directory: string): Promise<ExitCode> {
@@ -256,6 +317,21 @@ program
   .option('--env <name>', 'environment to validate against (default: env.default)')
   .option('--var <name=value>', 'set a variable; repeatable', collectVar, {})
   .action((options: VariableOptions) => finish(validateCommand(options)));
+
+const auth = program.command('auth').description('log in to the OAuth providers declared under "auth" in httpi.yaml');
+
+auth
+  .command('login')
+  .description('authorization_code login in the browser (with PKCE); stores the token in .httpi/tokens.json')
+  .argument('<name>', 'auth block of httpi.yaml')
+  .option('--env <name>', 'environment used to resolve the variables of the auth block')
+  .option('--var <name=value>', 'set a variable; repeatable', collectVar, {})
+  .action((name: string, options: VariableOptions) => finish(authLoginCommand(name, options)));
+
+auth
+  .command('status')
+  .description('show each auth block and whether its login is still valid (never prints tokens)')
+  .action(() => finish(authStatusCommand()));
 
 program
   .command('import')

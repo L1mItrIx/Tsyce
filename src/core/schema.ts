@@ -134,6 +134,16 @@ export const authSchema = z.discriminatedUnion('flow', [
     /** Omit for public clients, which identify themselves with the client id alone. */
     clientSecret: z.string().min(1).optional(),
   }),
+  // For a person at their own machine: `httpi auth login <name>` opens the browser once.
+  z.strictObject({
+    ...oauthCommon,
+    flow: z.literal('authorization_code'),
+    authorizationUrl: z.string().min(1),
+    /** Omit for public clients; PKCE protects the exchange either way. */
+    clientSecret: z.string().min(1).optional(),
+    /** Port of the local callback, http://127.0.0.1:<port>/callback, as registered with the provider. */
+    redirectPort: z.number().int().min(1).max(65535).default(8787),
+  }),
 ]);
 
 export type AuthConfig = z.infer<typeof authSchema>;
