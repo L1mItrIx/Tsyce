@@ -13,7 +13,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 - [x] F1.1 `runner/detect.ts`: binario de curl y versión mínima 7.83.0
 - [x] F1.2 `runner/curl-args.ts`: request → `string[]`
 - [x] F1.3 `runner/exec.ts`: spawn, `-w`, `-o`, temporales, errores
-- [ ] F1.4 Tests de integración con servidor `node:http`: 200 JSON, 404, puerto cerrado, timeout, redirect
+- [~] F1.4 Tests de integración con servidor `node:http`: 200 JSON, 404, puerto cerrado, timeout, redirect — rama `claude/bold-albattani-fsyz04`
 
 ## Fase 2 — Formato y `run`
 - [ ] F2.1 `schema.ts` (zod) y `file.ts` (YAML/JSON)
