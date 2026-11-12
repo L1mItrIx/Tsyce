@@ -10,11 +10,12 @@ export function assertCliIsBuilt(): void {
   if (!existsSync(CLI)) throw new Error('dist/cli.js is missing: run `npm run build` before the e2e tests');
 }
 
-/** Runs the built CLI. `stdin`, when given, is written to the process and closed. */
-export function httpi(args: string[], options: { env?: NodeJS.ProcessEnv; stdin?: string } = {}): Promise<CliResult> {
+/** Runs the built CLI, in `cwd` when given. `stdin`, when given, is written to the process and closed. */
+export function httpi(args: string[], options: { env?: NodeJS.ProcessEnv; stdin?: string; cwd?: string } = {}): Promise<CliResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [CLI, ...args], {
       env: { ...process.env, ...options.env },
+      cwd: options.cwd,
       stdio: [options.stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
     });
     let stdout = '';

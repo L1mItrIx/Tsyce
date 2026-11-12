@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { TestFileError } from '../../src/core/file.js';
-import { expandRun, findProjectFile, readProjectFile } from '../../src/core/project.js';
+import { expandRun, findProjectFile, projectEnvironment, readProjectFile } from '../../src/core/project.js';
 import { projectFileSchema } from '../../src/core/schema.js';
 
 let root: string;
@@ -98,5 +98,41 @@ describe('expandRun', () => {
     await expect(expand(['tests/nope.yaml'])).rejects.toThrow(/httpi\.yaml: run entry "tests\/nope\.yaml" does not exist/);
     await expect(expand(['tests/*.json'])).rejects.toThrow(/httpi\.yaml: run pattern "tests\/\*\.json" matches no files/);
     await expect(expand(['tests/nope.yaml'])).rejects.toThrow(TestFileError);
+  });
+});
+
+describe('projectEnvironment', () => {
+  const env = { default: 'dev', environments: { dev: { baseUrl: 'http://dev' }, prod: { baseUrl: 'https://prod' } } };
+  const project = (extra: object = {}) => projectFileSchema.parse({ version: 1, run: ['tests/login.yaml'], ...extra });
+  const envDir = () => join(root, 'tests', 'admin', 'deep');
+  const path = () => join(envDir(), 'httpi.yaml');
+
+  test('uses env.default, and --env wins over it', async () => {
+    expect(await projectEnvironment(project({ env }), path(), undefined)).toEqual({ variables: { baseUrl: 'http://dev' }, warnings: [] });
+    expect(await projectEnvironment(project({ env }), path(), 'prod')).toEqual({ variables: { baseUrl: 'https://prod' }, warnings: [] });
+  });
+
+  test('no default and no --env means no environment variables', async () => {
+    const withoutDefault = project({ env: { environments: env.environments } });
+    expect(await projectEnvironment(withoutDefault, path(), undefined)).toEqual({ variables: {}, warnings: [] });
+    expect(await projectEnvironment(project(), path(), undefined)).toEqual({ variables: {}, warnings: [] });
+  });
+
+  test('an unknown environment is an error that lists the available ones', async () => {
+    await expect(projectEnvironment(project({ env }), path(), 'staging')).rejects.toThrow(/no environment "staging"; available: dev, prod/);
+    await expect(projectEnvironment(project({ env: { ...env, default: 'qa' } }), path(), undefined)).rejects.toThrow(TestFileError);
+  });
+
+  test('httpi.env.yaml: still read when the project has no env block, ignored with a warning when it has one', async () => {
+    await writeFile(join(envDir(), 'httpi.env.yaml'), 'legacy: { baseUrl: "http://legacy" }\n');
+    try {
+      expect(await projectEnvironment(project(), path(), 'legacy')).toEqual({ variables: { baseUrl: 'http://legacy' }, warnings: [] });
+      expect(await projectEnvironment(project({ env }), path(), undefined)).toEqual({
+        variables: { baseUrl: 'http://dev' },
+        warnings: ['httpi.env.yaml is ignored: httpi.yaml declares the environments'],
+      });
+    } finally {
+      await rm(join(envDir(), 'httpi.env.yaml'));
+    }
   });
 });

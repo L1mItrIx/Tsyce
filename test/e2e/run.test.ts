@@ -126,7 +126,6 @@ test('exit 2 for a missing file', async () => {
 });
 
 test.each([
-  ['missing argument', ['run']],
   ['unknown command', ['frobnicate']],
   ['unknown option', ['run', 'x.yaml', '--frobnicate']],
 ])('exit 2 for wrong usage: %s', async (_name, args) => {

@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { glob } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
-import { parseWith, readTextFile, TestFileError } from './file.js';
+import { ENV_FILE_NAME, parseWith, readEnvironment, readTextFile, TestFileError } from './file.js';
 import { type ProjectFile, projectFileSchema } from './schema.js';
 
 export const PROJECT_FILE_NAME = 'httpi.yaml';
@@ -45,4 +45,29 @@ export async function expandRun(project: ProjectFile, projectPath: string): Prom
     files.push(...matches.sort());
   }
   return files;
+}
+
+/**
+ * Variables of the environment a project run uses: `--env`, or else `env.default`.
+ * A project without an `env` block still reads the older httpi.env.yaml next to it.
+ */
+export async function projectEnvironment(
+  project: ProjectFile,
+  projectPath: string,
+  envName: string | undefined,
+): Promise<{ variables: Record<string, string>; warnings: string[] }> {
+  if (project.env === undefined) {
+    return { variables: envName === undefined ? {} : await readEnvironment(projectPath, envName), warnings: [] };
+  }
+  const warnings = existsSync(join(dirname(resolve(projectPath)), ENV_FILE_NAME))
+    ? [`${ENV_FILE_NAME} is ignored: ${PROJECT_FILE_NAME} declares the environments`]
+    : [];
+  const name = envName ?? project.env.default;
+  if (name === undefined) return { variables: {}, warnings };
+  const variables = project.env.environments[name];
+  if (variables === undefined) {
+    const available = Object.keys(project.env.environments).join(', ') || '(none)';
+    throw new TestFileError(`${projectPath}: no environment "${name}"; available: ${available}`);
+  }
+  return { variables, warnings };
 }

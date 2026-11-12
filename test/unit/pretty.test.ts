@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { formatPretty } from '../../src/core/reporter/pretty.js';
+import { formatPretty, formatPrettyProject } from '../../src/core/reporter/pretty.js';
 import type { TestOutcome } from '../../src/core/run.js';
 
 const outcomes: TestOutcome[] = [
@@ -88,4 +88,35 @@ test('authentication response fields are identified as hidden rather than report
   const report = formatPretty(undefined, [{ ...outcomes[0]!, responseHidden: true }], { color: false, showResponse: true });
   expect(report).toContain('Authentication response hidden');
   expect(report).not.toContain('Headers:');
+});
+
+test('project report lists every file, marks the ones not run and ends with one summary', () => {
+  const suites = [
+    { name: 'Login', outcomes: outcomes.slice(0, 1) },
+    { name: 'tests/users.yaml', outcomes: outcomes.slice(1) },
+    { name: 'tests/admin.yaml', outcomes: [] },
+  ];
+  expect(formatPrettyProject(suites, { color: false })).toBe(
+    [
+      'Login',
+      '',
+      '✓ POST /users returns 201 (201, 120 ms)',
+      '    ✓ status is 201',
+      '    ✓ $.id exists',
+      '',
+      'tests/users.yaml',
+      '',
+      '✗ GET /users/7 (404, 12 ms)',
+      '    ✗ status is 200: got 404',
+      '    ✓ time is at most 800 ms',
+      '! GET /health',
+      '    curl error 7: Failed to connect to 127.0.0.1 port 1',
+      '',
+      'tests/admin.yaml',
+      '',
+      '- not run: the flow stopped before this file',
+      '',
+      '3 files, 3 tests: 1 passed, 1 failed, 1 errored',
+    ].join('\n'),
+  );
 });

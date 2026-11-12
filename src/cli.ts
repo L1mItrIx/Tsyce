@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { text } from 'node:stream/consumers';
 import { existsSync } from 'node:fs';
+import { basename, dirname, relative, resolve } from 'node:path';
 import { Command, InvalidArgumentError, Option } from 'commander';
 import { CurlExportError, exportCurl } from './core/exporter/curl.js';
 import {
@@ -16,9 +17,10 @@ import {
 import { type Dialect, DIALECTS, tokenizeCurl } from './core/importer/detect-dialect.js';
 import { CurlImportError, extractSecrets, mapFlags } from './core/importer/map-flags.js';
 import { ShellSyntaxError } from './core/importer/tokenize-bash.js';
-import { formatPretty } from './core/reporter/pretty.js';
-import { formatJUnit } from './core/reporter/junit.js';
-import { EXIT, type ExitCode, exitCodeFor, runTestFile, validateRunVariables } from './core/run.js';
+import { expandRun, findProjectFile, PROJECT_FILE_NAME, projectEnvironment, readProjectFile } from './core/project.js';
+import { formatPretty, formatPrettyProject } from './core/reporter/pretty.js';
+import { formatJUnit, formatJUnitSuites } from './core/reporter/junit.js';
+import { EXIT, type ExitCode, exitCodeFor, runTestFile, runTestFiles, validateRunVariables } from './core/run.js';
 import { detectCurl } from './core/runner/detect.js';
 import { CurlUnavailableError, runRequest } from './core/runner/exec.js';
 import type { TestFile } from './core/schema.js';
@@ -29,10 +31,18 @@ const say = (line: string) => process.stderr.write(`${line}\n`);
 type VariableOptions = { env?: string; var: Record<string, string> };
 type RunOptions = VariableOptions & { reporter: 'pretty' | 'junit'; showResponse?: true };
 
-async function runCommand(path: string, options: RunOptions): Promise<ExitCode> {
+function checkRunOptions(options: RunOptions): void {
   if (options.showResponse && options.reporter !== 'pretty') {
     throw new TestFileError('--show-response requires --reporter pretty; omit it when generating JUnit');
   }
+}
+
+const prettyOptions = (options: RunOptions) => ({
+  color: process.stdout.isTTY === true && !process.env.NO_COLOR,
+  showResponse: options.showResponse === true,
+});
+
+async function runFileCommand(path: string, options: RunOptions): Promise<ExitCode> {
   const file = await readTestFile(path);
   const sources = {
     cli: options.var,
@@ -43,10 +53,40 @@ async function runCommand(path: string, options: RunOptions): Promise<ExitCode> 
   const title = resolveVars(file.name, sources);
   const curl = await detectCurl();
   const outcomes = await runTestFile(file, curl.bin, sources);
-  const color = process.stdout.isTTY === true && !process.env.NO_COLOR;
-  const report = options.reporter === 'junit' ? formatJUnit(title, outcomes) : formatPretty(title, outcomes, { color, showResponse: options.showResponse === true });
+  const report = options.reporter === 'junit' ? formatJUnit(title, outcomes) : formatPretty(title, outcomes, prettyOptions(options));
   process.stdout.write(`${report}\n`);
   return exitCodeFor(outcomes);
+}
+
+/** Runs everything httpi.yaml lists, as one flow that shares variables and tokens. */
+async function runProjectCommand(projectPath: string, options: RunOptions): Promise<ExitCode> {
+  const project = await readProjectFile(projectPath);
+  const environment = await projectEnvironment(project, projectPath, options.env);
+  for (const warning of environment.warnings) say(`warning: ${warning}`);
+  const sources = { cli: options.var, system: process.env, file: environment.variables };
+
+  const paths = await expandRun(project, projectPath);
+  const files = await Promise.all(paths.map((path) => readTestFile(path)));
+  validateRunVariables(files, sources);
+  const curl = await detectCurl();
+  const perFile = await runTestFiles(files, curl.bin, sources);
+  const suites = files.map((file, index) => ({
+    name: resolveVars(file.name, sources) ?? relative(dirname(projectPath), paths[index]!).replaceAll('\\', '/'),
+    outcomes: perFile[index]!,
+  }));
+  const report = options.reporter === 'junit' ? formatJUnitSuites(suites) : formatPrettyProject(suites, prettyOptions(options));
+  process.stdout.write(`${report}\n`);
+  return exitCodeFor(perFile.flat());
+}
+
+async function runCommand(path: string | undefined, options: RunOptions): Promise<ExitCode> {
+  checkRunOptions(options);
+  if (path !== undefined && basename(path) !== PROJECT_FILE_NAME) return runFileCommand(path, options);
+  const projectPath = path ?? findProjectFile(process.cwd());
+  if (projectPath === null) {
+    throw new TestFileError(`no ${PROJECT_FILE_NAME} found in this directory or its parents; pass a test file: httpi run <file>`);
+  }
+  return runProjectCommand(resolve(projectPath), options);
 }
 
 type ImportOptions = { dialect?: Dialect; output?: string; name?: string; keepSecrets?: true };
@@ -151,13 +191,13 @@ program
 
 program
   .command('run')
-  .description('run the tests in a file; exit 0 = pass, 1 = assert failed, 2 = invalid file or usage, 3 = curl or network error')
-  .argument('<file>', 'test file (YAML or JSON)')
+  .description('run a test file, or the whole project in httpi.yaml; exit 0 = pass, 1 = assert failed, 2 = invalid file or usage, 3 = curl or network error')
+  .argument('[file]', 'test file (YAML or JSON); without it, runs the project in the closest httpi.yaml')
   .addOption(new Option('--reporter <format>', 'output format').choices(['pretty', 'junit']).default('pretty'))
   .option('--show-response', 'show response status, headers and body for each request (pretty reporter)')
-  .option('--env <name>', 'environment from httpi.env.yaml')
+  .option('--env <name>', 'environment from httpi.yaml or httpi.env.yaml')
   .option('--var <name=value>', 'set a variable; repeatable, wins over the environment', collectVar, {})
-  .action((path: string, options: RunOptions) => finish(runCommand(path, options)));
+  .action((path: string | undefined, options: RunOptions) => finish(runCommand(path, options)));
 
 program
   .command('import')

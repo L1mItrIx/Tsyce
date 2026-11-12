@@ -26,6 +26,9 @@ export type TestOutcome = {
   responseHidden?: boolean;
 };
 
+/** The outcomes of one test file within a run; `name` is its title in reports. */
+export type Suite = { name: string | undefined; outcomes: TestOutcome[] };
+
 export type OutcomeStatus = 'passed' | 'failed' | 'errored';
 
 export function outcomeStatus(outcome: TestOutcome): OutcomeStatus {
@@ -40,7 +43,6 @@ export function exitCodeFor(outcomes: TestOutcome[]): ExitCode {
   return EXIT.ok;
 }
 
-/** Runs the tests of a file one after another, in file order. */
 const EMPTY_SOURCES: VarSources = { cli: {}, system: {}, file: {} };
 
 function resolvedTest(test: TestFile['tests'][number], sources: VarSources, runtime: VarSources['runtime']) {
@@ -49,44 +51,57 @@ function resolvedTest(test: TestFile['tests'][number], sources: VarSources, runt
 }
 
 /** Validate every reference before sending anything, reserving authToken for prior captures. */
-export function validateRunVariables(file: TestFile, sources: VarSources = EMPTY_SOURCES): void {
-  const hasCapture = file.tests.some((test) => test.capture);
+export function validateRunVariables(input: TestFile | TestFile[], sources: VarSources = EMPTY_SOURCES): void {
+  const tests = [input].flat().flatMap((file) => file.tests);
+  const hasCapture = tests.some((test) => test.capture);
   let available = false;
-  for (const test of file.tests) {
+  for (const test of tests) {
     resolvedTest(test, sources, hasCapture ? { authToken: available ? '[runtime token]' : undefined } : sources.runtime);
     if (test.capture) available = true;
   }
 }
 
-export async function runTestFile(file: TestFile, curlBin: string, sources: VarSources = EMPTY_SOURCES): Promise<TestOutcome[]> {
-  validateRunVariables(file, sources);
-  const outcomes: TestOutcome[] = [];
+/**
+ * Runs several files as one flow, in order: a token captured in one file is available to the
+ * next ones. Returns the outcomes of each file; a file the flow never reached has none.
+ */
+export async function runTestFiles(files: TestFile[], curlBin: string, sources: VarSources = EMPTY_SOURCES): Promise<TestOutcome[][]> {
+  validateRunVariables(files, sources);
   const secrets: string[] = [];
-  const runtime = file.tests.some((test) => test.capture) ? { authToken: undefined as string | undefined } : undefined;
-  for (const template of file.tests) {
-    const test = resolvedTest(template, sources, runtime ?? sources.runtime);
-    const result = await runRequest(curlBin, test.request);
-    const asserts = result.error === null ? checkExpectations(test.expect, result) : [];
-    if (test.capture) {
-      let captured = false;
-      if (runtime) runtime.authToken = undefined;
-      if (result.error === null && asserts.every((assert) => assert.ok)) {
-        try {
-          const token = captureAuthToken(result, test.capture);
-          secrets.push(token); if (runtime) runtime.authToken = token; captured = true;
-        } catch { /* Report a failed prerequisite without exposing the authentication response. */ }
-      }
-      const safeAsserts = asserts.map((assert, index) => ({ ok: assert.ok, label: `authentication assertion ${index + 1}`, ...(!assert.ok ? { message: 'Authentication assertion failed; flow stopped' } : {}) }));
-      safeAsserts.push({ ok: captured, label: 'authentication token captured', ...(!captured ? { message: 'Authentication or token capture failed; flow stopped; remaining requests were not executed' } : {}) });
-      outcomes.push({ name: test.name, responseHidden: true, result: { ...result, headers: {}, body: '[authentication response hidden]', error: result.error === null ? null : 'Authentication request failed; flow stopped' }, asserts: safeAsserts });
-      if (!captured) break;
-    } else outcomes.push({ name: test.name, result, asserts });
+  const runtime = files.some((file) => file.tests.some((test) => test.capture)) ? { authToken: undefined as string | undefined } : undefined;
+  const perFile: TestOutcome[][] = files.map(() => []);
+  flow: for (const [index, file] of files.entries()) {
+    const outcomes = perFile[index]!;
+    for (const template of file.tests) {
+      const test = resolvedTest(template, sources, runtime ?? sources.runtime);
+      const result = await runRequest(curlBin, test.request);
+      const asserts = result.error === null ? checkExpectations(test.expect, result) : [];
+      if (test.capture) {
+        let captured = false;
+        if (runtime) runtime.authToken = undefined;
+        if (result.error === null && asserts.every((assert) => assert.ok)) {
+          try {
+            const token = captureAuthToken(result, test.capture);
+            secrets.push(token); if (runtime) runtime.authToken = token; captured = true;
+          } catch { /* Report a failed prerequisite without exposing the authentication response. */ }
+        }
+        const safeAsserts = asserts.map((assert, index) => ({ ok: assert.ok, label: `authentication assertion ${index + 1}`, ...(!assert.ok ? { message: 'Authentication assertion failed; flow stopped' } : {}) }));
+        safeAsserts.push({ ok: captured, label: 'authentication token captured', ...(!captured ? { message: 'Authentication or token capture failed; flow stopped; remaining requests were not executed' } : {}) });
+        outcomes.push({ name: test.name, responseHidden: true, result: { ...result, headers: {}, body: '[authentication response hidden]', error: result.error === null ? null : 'Authentication request failed; flow stopped' }, asserts: safeAsserts });
+        if (!captured) break flow;
+      } else outcomes.push({ name: test.name, result, asserts });
+    }
   }
   // Preserve structural field names even when a token is a short substring such as "a".
-  return outcomes.map((outcome) => ({
+  return perFile.map((outcomes) => outcomes.map((outcome) => ({
     ...outcome,
     name: maskSecrets(outcome.name, secrets),
     result: { ...outcome.result, headers: maskSecrets(outcome.result.headers, secrets), body: maskSecrets(outcome.result.body, secrets), error: maskSecrets(outcome.result.error, secrets) },
     asserts: outcome.asserts.map((assert) => ({ ...assert, label: maskSecrets(assert.label, secrets), ...(assert.message !== undefined ? { message: maskSecrets(assert.message, secrets) } : {}) })),
-  }));
+  })));
+}
+
+/** Runs the tests of a file one after another, in file order. */
+export async function runTestFile(file: TestFile, curlBin: string, sources: VarSources = EMPTY_SOURCES): Promise<TestOutcome[]> {
+  return (await runTestFiles([file], curlBin, sources))[0]!;
 }

@@ -1,5 +1,5 @@
 import { styleText } from 'node:util';
-import { type OutcomeStatus, outcomeStatus, type TestOutcome } from '../run.js';
+import { type OutcomeStatus, outcomeStatus, type Suite, type TestOutcome } from '../run.js';
 
 export type PrettyOptions = { color: boolean; showResponse?: boolean };
 
@@ -60,19 +60,46 @@ function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`;
 }
 
-/** Human-readable report for a test file. Ends without a trailing newline. */
-export function formatPretty(fileName: string | undefined, outcomes: TestOutcome[], options: PrettyOptions): string {
-  const paint: Paint = (format, text) =>
-    options.color ? styleText(format, text, { validateStream: false }) : text;
+type Painter = { paint: Paint; showResponse: boolean };
 
-  const lines: string[] = [];
-  if (fileName !== undefined) lines.push(paint('bold', fileName), '');
-  for (const outcome of outcomes) lines.push(...formatOutcome(outcome, paint, options.showResponse === true));
+function painter(options: PrettyOptions): Painter {
+  return {
+    paint: (format, text) => (options.color ? styleText(format, text, { validateStream: false }) : text),
+    showResponse: options.showResponse === true,
+  };
+}
 
+function summary(outcomes: TestOutcome[], paint: Paint): string {
   const count = (status: OutcomeStatus) => outcomes.filter((o) => outcomeStatus(o) === status).length;
   const parts = [`${count('passed')} passed`];
   if (count('failed') > 0) parts.push(paint('red', `${count('failed')} failed`));
   if (count('errored') > 0) parts.push(paint('yellow', `${count('errored')} errored`));
-  lines.push('', `${plural(outcomes.length, 'test')}: ${parts.join(', ')}`);
+  return `${plural(outcomes.length, 'test')}: ${parts.join(', ')}`;
+}
+
+function formatSuite(suite: Suite, { paint, showResponse }: Painter): string[] {
+  const lines: string[] = [];
+  if (suite.name !== undefined) lines.push(paint('bold', suite.name), '');
+  for (const outcome of suite.outcomes) lines.push(...formatOutcome(outcome, paint, showResponse));
+  return lines;
+}
+
+/** Human-readable report for a test file. Ends without a trailing newline. */
+export function formatPretty(fileName: string | undefined, outcomes: TestOutcome[], options: PrettyOptions): string {
+  const tools = painter(options);
+  return [...formatSuite({ name: fileName, outcomes }, tools), '', summary(outcomes, tools.paint)].join('\n');
+}
+
+/** Report for a project run: every file in order, then one summary for the whole run. */
+export function formatPrettyProject(suites: Suite[], options: PrettyOptions): string {
+  const tools = painter(options);
+  const lines: string[] = [];
+  for (const suite of suites) {
+    lines.push(...formatSuite(suite, tools));
+    if (suite.outcomes.length === 0) lines.push(tools.paint('yellow', '- not run: the flow stopped before this file'));
+    lines.push('');
+  }
+  const all = suites.flatMap((suite) => suite.outcomes);
+  lines.push(`${plural(suites.length, 'file')}, ${summary(all, tools.paint)}`);
   return lines.join('\n');
 }
