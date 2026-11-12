@@ -1,0 +1,5 @@
+# Create a user (from API docs)
+curl.exe -X POST "https://api.example.com/v1/users" `
+  -H "Authorization: Bearer $env:API_TOKEN" `
+  -H "Content-Type: application/json" `
+  -d '{"name": "Ana", "price": "$5"}'

@@ -28,7 +28,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 ## Fase 4 — Importador de curl
 - [x] F4.1 `tokenize-bash.ts`
 - [x] F4.2 `tokenize-cmd.ts`
-- [ ] F4.3 `tokenize-powershell.ts`
+- [x] F4.3 `tokenize-powershell.ts`
 - [ ] F4.4 `detect-dialect.ts` y `--dialect`
 - [ ] F4.5 `map-flags.ts` (lista blanca de PLAN §3) con advertencias
 - [ ] F4.6 Detección de secretos → propuesta de `{{var}}`
@@ -68,6 +68,7 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-12 — F3.2: `httpi.env.yaml` se busca junto al archivo de test y, si no está, en el directorio actual; solo se lee si se pasa `--env`. `--var` es repetible y se parte en el primer `=`. Entorno inexistente, `--var` mal formado y variable sin resolver salen con 2.
 - 2026-11-12 — F4.1: los tokenizadores no expanden `$VAR` ni sustituciones: quedan como texto. Comilla sin cerrar lanza `ShellSyntaxError` (definido en `tokenize-bash.ts`, lo reutilizan los otros dialectos). La tabla de Bash se contrastó a mano contra `bash` real (15 entradas, 0 diferencias).
 - 2026-11-12 — F4.2: el tokenizador de cmd aplica dos pasos, como Windows: primero los `^` de cmd.exe y luego el reparto de argumentos del runtime de C (`\"`, `""`, barras antes de comilla). `%VAR%` queda como texto. No se pudo contrastar con un Windows real.
+- 2026-11-12 — F4.3: el tokenizador de PowerShell devuelve el texto que el usuario quiso escribir; no imita el bug de Windows PowerShell 5.1 que pierde las comillas dobles internas al llamar a un `.exe`. `$var` y `$env:X` quedan como texto. No se pudo contrastar con un PowerShell real.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.

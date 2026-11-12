@@ -1,0 +1,5 @@
+curl.exe "https://api.example.com/v1/users?page=2&sort=name" `
+  -H "accept: application/json, text/plain, */*" `
+  -H "sec-ch-ua: `"Chromium`";v=`"130`", ""Not?A_Brand"";v=`"99`"" `
+  -H 'x-note: it''s here' `
+  -b "session=FAKE_SESSION; theme=dark"
