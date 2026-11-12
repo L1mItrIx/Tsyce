@@ -17,7 +17,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 
 ## Fase 2 — Formato y `run`
 - [x] F2.1 `schema.ts` (zod) y `file.ts` (YAML/JSON)
-- [ ] F2.2 `asserts.ts`: status, maxTimeMs, headers, json (json-p3)
+- [x] F2.2 `asserts.ts`: status, maxTimeMs, headers, json (json-p3)
 - [ ] F2.3 `reporter/pretty` y códigos de salida 0/1/2/3
 - [ ] F2.4 `httpi run <archivo>` + tests e2e de códigos de salida
 
@@ -61,6 +61,7 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-12 — F1.2: el esquema de `request` nace ya en `schema.ts` (el tipo sale de zod); opciones planas en `request` (`followRedirects`, `insecure`, `compressed`, `timeoutMs`); body `{ json }` o `{ text }`. `curl-args` siempre añade `--globoff` y `--url` (URL literal), y solo pasa `--request` cuando el método no es el que curl ya infiere.
 - 2026-11-12 — F1.3: `runRequest` pasa `-q` (ignora `~/.curlrc`) para que la prueba sea reproducible; un fallo de curl no lanza excepción: devuelve `status: 0`, `curlExitCode` y `error`. El body se devuelve como texto UTF-8.
 - 2026-11-12 — F2.1: objetos estrictos (clave desconocida = error, no se ignora); `expect` es opcional (sin asserts el test solo exige que curl obtenga respuesta); cada assert JSON lleva `path` y exactamente un comparador; `contains` acepta cualquier valor JSON.
+- 2026-11-12 — F2.2: si un `path` coincide con varios nodos, el comparador debe cumplirse en todos (y debe haber al menos uno); `equals` no convierte tipos; en headers basta con que un valor del header coincida; un `path` que no compila como JSONPath es error de archivo (salida 2), no assert fallido.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.

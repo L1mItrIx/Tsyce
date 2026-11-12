@@ -45,6 +45,7 @@ describe('expectSchema', () => {
     ['json assert with two matchers', { json: [{ path: '$.a', equals: 1, exists: true }] }],
     ['json assert without path', { json: [{ equals: 1 }] }],
     ['path that is not JSONPath', { json: [{ path: 'a.b', exists: true }] }],
+    ['path with JSONPath syntax error', { json: [{ path: '$.a[', exists: true }] }],
     ['invalid regex', { json: [{ path: '$.a', matches: '(' }] }],
     ['unknown type', { json: [{ path: '$.a', type: 'date' }] }],
     ['unknown assert key', { bodyContains: 'x' }],

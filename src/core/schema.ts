@@ -1,3 +1,4 @@
+import { jsonpath } from 'json-p3';
 import { z } from 'zod';
 
 export const bodySchema = z.union([
@@ -40,7 +41,13 @@ const regexSource = z.string().refine(
   { error: 'matches must be a valid regular expression' },
 );
 
-const jsonPath = z.string().startsWith('$', 'path must be a JSONPath starting with $');
+const jsonPath = z.string().superRefine((path, ctx) => {
+  try {
+    jsonpath.compile(path);
+  } catch (cause) {
+    ctx.addIssue({ code: 'custom', message: `invalid JSONPath: ${(cause as Error).message}` });
+  }
+});
 
 export const jsonExpectSchema = z.union([
   z.strictObject({ path: jsonPath, equals: z.json() }),
