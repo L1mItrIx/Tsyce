@@ -1,0 +1,27 @@
+{
+  "name": "httpi",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Paste a curl or answer a few questions, and get an API test ready to run in CI.",
+  "type": "module",
+  "bin": {
+    "httpi": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.build.json",
+    "check": "npm run typecheck && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}
