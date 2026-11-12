@@ -93,7 +93,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 - [x] V5.4 Asistente `httpi auth add`
 
 ### V6 — Importar Postman
-- [ ] V6.1 `importer/postman.ts`: colección v2.1 → `TestFile[]` + advertencias
+- [x] V6.1 `importer/postman.ts`: colección v2.1 → `TestFile[]` + advertencias
 - [ ] V6.2 `httpi import --from`, salida a carpeta, entorno Postman → `env`
 
 ### V7 — Importar OpenAPI
@@ -174,6 +174,7 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-12 — V5.2: `flow: refresh_token` canjea `refreshToken` (pensado para `${VAR}`) al inicio de cada corrida. Sin `clientSecret` se trata como cliente público (solo `client_id` en el body). Limitación: si el servidor rota el refresh token en cada canje, httpi no guarda el nuevo; ese caso necesita `authorization_code` en local (V5.3) o un refresh token no rotatorio en CI.
 - 2026-11-12 — V5.3: `flow: authorization_code` con PKCE (S256) y `state`; callback en `http://127.0.0.1:<redirectPort>/callback` (por defecto 8787; hay que registrarlo en el proveedor). `httpi auth login <nombre>` imprime la URL y abre el navegador (`open`/`xdg-open`/`rundll32`, sin shell; `HTTPI_NO_BROWSER=1` lo evita), espera hasta 5 minutos y guarda el resultado en `.httpi/tokens.json` (permisos 600 donde aplican) junto a `httpi.yaml`. `httpi run` usa el token guardado hasta 30 s antes de caducar; si caducó lo renueva con el refresh token y guarda el nuevo (también si el servidor lo rota). Sin sesión, sesión caducada sin refresh token o proveedor que rechaza → salida 3 con el comando a ejecutar. `httpi auth status` lista los bloques sin mostrar tokens. Sin verificar: el login con un navegador real y un proveedor real; en los tests el "navegador" es una petición al callback contra un proveedor falso.
 - 2026-11-12 — V5.4: `httpi auth add` (solo teclado, requiere TTY) pregunta nombre, flujo, URLs, client id, scopes y, para los secretos, el NOMBRE de la variable de entorno: en el YAML solo queda `${NOMBRE}` y rechaza algo que parezca el secreto. En `authorization_code` y `refresh_token` el secreto vacío significa cliente público. El bloque se inserta en `httpi.yaml` conservando comentarios y no pisa un nombre existente. La lógica es un reducer puro en `auth-wizard.tsx`. Verificado también en un pseudo-terminal real.
+- 2026-11-12 — V6.1: `importPostman` acepta colecciones v2.0/v2.1: un archivo por carpeta de primer nivel (las subcarpetas pasan al nombre del test, `Sub / Request`) y uno más para las requests sueltas. `{{var}}` se conserva; `:id` de la ruta se sustituye por su valor guardado o queda como `{{id}}`. Auth heredada colección → carpeta → request: bearer y basic pasan a `Authorization`, apikey a header o query, oauth2 (`client_credentials`, `authorization_code`) a un bloque `auth` del proyecto sin copiar nunca el client secret ni el token guardado. Avisan y no se convierten: scripts, GraphQL, body `file`, otros tipos de auth y grants. Los tests importados salen sin `expect`. Reutiliza `CurlImportError` como error de importación. El fixture es una colección escrita a mano con el formato v2.1, no exportada de Postman.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.
