@@ -31,7 +31,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 - [x] F4.3 `tokenize-powershell.ts`
 - [x] F4.4 `detect-dialect.ts` y `--dialect` (el flag `--dialect` se expone en F4.7)
 - [x] F4.5 `map-flags.ts` (lista blanca de PLAN §3) con advertencias
-- [ ] F4.6 Detección de secretos → propuesta de `{{var}}`
+- [x] F4.6 Detección de secretos → propuesta de `{{var}}`
 - [ ] F4.7 `httpi import` + oráculo curlconverter en tests
 
 ## Fase 5 — Modo guiado
@@ -71,6 +71,7 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-12 — F4.3: el tokenizador de PowerShell devuelve el texto que el usuario quiso escribir; no imita el bug de Windows PowerShell 5.1 que pierde las comillas dobles internas al llamar a un `.exe`. `$var` y `$env:X` quedan como texto. No se pudo contrastar con un PowerShell real.
 - 2026-11-12 — F4.4: detección de dialecto por señales, de más a menos fuerte: carácter de continuación al final de línea, comillas propias de un shell (`^"`, `` `" ``, `$env:`), nombre `curl.exe`; sin señales se lee como Bash.
 - 2026-11-12 — F4.5: nuevo body `{ form: [...] }` (expresiones `-F` de curl tal cual) para representar multipart. `-u` se convierte en header `Authorization: Basic …`; `-b`, `-A`, `-e` en headers. El body importado siempre se guarda como `{ text }` sin re-serializar. Todo flag fuera de la lista blanca avisa, incluidos `-s`/`-S`/`-v`; hay una lista de flags de curl con valor solo para saltar su valor y no confundirlo con la URL. `@archivo` en `-d`/`-b` avisa y se ignora.
+- 2026-11-12 — F4.6: se consideran secretos los headers `Authorization` y `Cookie` (cubre `-u` y `-b`). Variables propuestas: `token` (Bearer), `basicAuth` (Basic), `authorization` (otros) y `cookie`. `extractSecrets` vive en `map-flags.ts`.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.
@@ -82,6 +83,7 @@ Ideas que surgieron y no se hicieron. No implementar sin aprobación.
 - Escape para escribir `{{` o `${` literales en un test.
 - Al importar, convertir `$VAR` de Bash en `${VAR}` de httpi.
 - Importador: `-I`/`--head` como método HEAD (hoy avisa como no soportado); leer `-d @archivo`; nombres largos abreviados de curl.
+- Tratar como secretos otros headers habituales (`X-Api-Key`, `Proxy-Authorization`) y parámetros de la URL (`?api_key=`).
 
 ## Bloqueos
 Qué impide avanzar y qué se necesita del usuario.

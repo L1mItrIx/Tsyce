@@ -261,3 +261,50 @@ export function mapFlags(tokens: string[]): ImportedRequest {
   }
   return { request: result.data, warnings: state.warnings };
 }
+
+export type Secret = {
+  /** Header the secret was found in, as written in the request. */
+  header: string;
+  /** Proposed variable name; the request refers to it as `{{variable}}`. */
+  variable: string;
+  /** The secret itself, removed from the request. */
+  value: string;
+};
+
+function referencesVariable(value: string): boolean {
+  return value.includes('{{') || value.includes('${');
+}
+
+function proposeSecret(header: string, value: string): { secret: Secret; replacement: string } | null {
+  const name = header.toLowerCase();
+  if (referencesVariable(value)) return null;
+  if (name === 'cookie') return { secret: { header, variable: 'cookie', value }, replacement: '{{cookie}}' };
+  if (name !== 'authorization') return null;
+
+  // Keep the scheme readable in the file: "Bearer {{token}}", "Basic {{basicAuth}}".
+  const space = value.indexOf(' ');
+  const scheme = space === -1 ? '' : value.slice(0, space);
+  const credentials = value.slice(space + 1).trim();
+  const variable = { bearer: 'token', basic: 'basicAuth' }[scheme.toLowerCase()];
+  if (variable === undefined || credentials === '') {
+    return { secret: { header, variable: 'authorization', value }, replacement: '{{authorization}}' };
+  }
+  return { secret: { header, variable, value: credentials }, replacement: `${scheme} {{${variable}}}` };
+}
+
+/**
+ * Moves credentials (Authorization and Cookie headers, which also covers -u and -b) out of the
+ * request, leaving `{{variable}}` references so they are not saved in the test file.
+ */
+export function extractSecrets(request: RequestSpec): { request: RequestSpec; secrets: Secret[] } {
+  const secrets: Secret[] = [];
+  const headers = Object.fromEntries(
+    Object.entries(request.headers).map(([header, value]) => {
+      const proposal = proposeSecret(header, value);
+      if (proposal === null) return [header, value];
+      secrets.push(proposal.secret);
+      return [header, proposal.replacement];
+    }),
+  );
+  return { request: { ...request, headers }, secrets };
+}

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { tokenizeCurl } from '../../src/core/importer/detect-dialect.js';
-import { CurlImportError, mapFlags } from '../../src/core/importer/map-flags.js';
+import { CurlImportError, extractSecrets, mapFlags } from '../../src/core/importer/map-flags.js';
 
 const API = 'https://api.example.com/users';
 const GET = { method: 'GET', url: API, headers: {} };
@@ -148,6 +148,51 @@ describe('errors', () => {
   ])('%s', (_name, tokens, message) => {
     expect(() => mapFlags(tokens)).toThrow(CurlImportError);
     expect(() => mapFlags(tokens)).toThrow(message);
+  });
+});
+
+describe('extractSecrets', () => {
+  type SecretCase = [name: string, args: string[], headers: Record<string, string>, secrets: unknown[]];
+
+  test.each<SecretCase>([
+    [
+      'Bearer token keeps its scheme',
+      ['-H', 'authorization: Bearer FAKE_TOKEN_123'],
+      { authorization: 'Bearer {{token}}' },
+      [{ header: 'authorization', variable: 'token', value: 'FAKE_TOKEN_123' }],
+    ],
+    [
+      '-u becomes Basic {{basicAuth}}',
+      ['-u', 'ana:s3cret'],
+      { Authorization: 'Basic {{basicAuth}}' },
+      [{ header: 'Authorization', variable: 'basicAuth', value: 'YW5hOnMzY3JldA==' }],
+    ],
+    [
+      'any other Authorization is replaced whole',
+      ['-H', 'Authorization: AWS4-HMAC-SHA256 Credential=FAKE, Signature=abc'],
+      { Authorization: '{{authorization}}' },
+      [{ header: 'Authorization', variable: 'authorization', value: 'AWS4-HMAC-SHA256 Credential=FAKE, Signature=abc' }],
+    ],
+    [
+      'an Authorization without scheme is replaced whole',
+      ['-H', 'Authorization: FAKE_KEY'],
+      { Authorization: '{{authorization}}' },
+      [{ header: 'Authorization', variable: 'authorization', value: 'FAKE_KEY' }],
+    ],
+    [
+      '-b cookies and other headers together',
+      ['-b', 'session=FAKE; theme=dark', '-H', 'Accept: */*', '-H', 'Authorization: Bearer T'],
+      { Cookie: '{{cookie}}', Accept: '*/*', Authorization: 'Bearer {{token}}' },
+      [
+        { header: 'Cookie', variable: 'cookie', value: 'session=FAKE; theme=dark' },
+        { header: 'Authorization', variable: 'token', value: 'T' },
+      ],
+    ],
+    ['a value that is already a variable is left alone', ['-H', 'Authorization: Bearer ${API_TOKEN}', '-b', 'sid={{sid}}'], { Authorization: 'Bearer ${API_TOKEN}', Cookie: 'sid={{sid}}' }, []],
+    ['no credentials, nothing to do', ['-H', 'X-Trace: Bearer abc'], { 'X-Trace': 'Bearer abc' }, []],
+  ])('%s', (_name, args, headers, secrets) => {
+    const { request } = mapFlags(['curl', ...args, API]);
+    expect(extractSecrets(request)).toEqual({ request: { ...request, headers }, secrets });
   });
 });
 
