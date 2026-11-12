@@ -1,0 +1,7 @@
+curl ^"https://api.example.com/v1/users?page=2^&sort=name^" ^
+  -H ^"accept: application/json, text/plain, */*^" ^
+  -H ^"accept-language: es-ES,es;q=0.9,en;q=0.8^" ^
+  -H ^"authorization: Bearer FAKE_TOKEN_123^" ^
+  -b ^"session=FAKE_SESSION; theme=dark^" ^
+  -H ^"sec-ch-ua: ^\^"Chromium^\^";v=^\^"130^\^", ^\^"Not?A_Brand^\^";v=^\^"99^\^"^" ^
+  -H ^"user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36^"

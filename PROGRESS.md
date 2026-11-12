@@ -27,7 +27,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 
 ## Fase 4 — Importador de curl
 - [x] F4.1 `tokenize-bash.ts`
-- [ ] F4.2 `tokenize-cmd.ts`
+- [x] F4.2 `tokenize-cmd.ts`
 - [ ] F4.3 `tokenize-powershell.ts`
 - [ ] F4.4 `detect-dialect.ts` y `--dialect`
 - [ ] F4.5 `map-flags.ts` (lista blanca de PLAN §3) con advertencias
@@ -67,6 +67,7 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-12 — F3.1: `{{nombre}}` busca en `--var`, luego en el entorno del sistema y luego en `httpi.env.yaml`; `${NOMBRE}` solo lee el entorno del sistema. Se sustituye en cualquier valor de texto del test (también en `expect`), nunca en claves; los valores no se vuelven a expandir.
 - 2026-11-12 — F3.2: `httpi.env.yaml` se busca junto al archivo de test y, si no está, en el directorio actual; solo se lee si se pasa `--env`. `--var` es repetible y se parte en el primer `=`. Entorno inexistente, `--var` mal formado y variable sin resolver salen con 2.
 - 2026-11-12 — F4.1: los tokenizadores no expanden `$VAR` ni sustituciones: quedan como texto. Comilla sin cerrar lanza `ShellSyntaxError` (definido en `tokenize-bash.ts`, lo reutilizan los otros dialectos). La tabla de Bash se contrastó a mano contra `bash` real (15 entradas, 0 diferencias).
+- 2026-11-12 — F4.2: el tokenizador de cmd aplica dos pasos, como Windows: primero los `^` de cmd.exe y luego el reparto de argumentos del runtime de C (`\"`, `""`, barras antes de comilla). `%VAR%` queda como texto. No se pudo contrastar con un Windows real.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.
@@ -83,3 +84,4 @@ Qué impide avanzar y qué se necesita del usuario.
 
 - El prototipo en Ink del usuario no está en el repo (afecta F5.2).
 - Los fixtures de `test/fixtures/curl/` están escritos a mano con el formato de DevTools, no copiados de un navegador real. Hace falta que el usuario pegue curls reales ("Copy as cURL (bash)" y "(cmd)") para validar el riesgo de comillas de PLAN §11.
+- Sin verificar en cmd: cómo escapa DevTools una barra invertida dentro del body (p. ej. `\n` en JSON) en "Copy as cURL (cmd)". Se quitó ese caso del fixture inventado hasta tener un pegado real.
