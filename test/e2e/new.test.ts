@@ -13,4 +13,5 @@ test('new documents the destination and name arguments', async () => {
   expect(result.code).toBe(0);
   expect(result.stdout).toContain('--name');
   expect(result.stdout).toContain('httpi.test.yaml');
+  expect(result.stdout).toContain('add requests in order');
 });

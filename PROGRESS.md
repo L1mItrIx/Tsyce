@@ -56,6 +56,8 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 
 - [x] U3 Mouse para el asistente, botones y ayudas de headers/body; commit `U3: add mouse controls and explain optional request fields`.
 
+- [x] U4 Varias requests desde el asistente, en un solo YAML y en orden; commit `U4: build ordered multi-request files in the wizard`.
+
 ## Decisiones
 Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 
@@ -97,6 +99,8 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-11 — El usuario solicita explícitamente mouse en el asistente; se incorpora U3 como excepción al alcance inicial de solo teclado. Se usa SGR en pantalla alternativa, sin dependencias nuevas; la publicación npm sigue aplazada.
 
 - 2026-11-11 — U3: clics en métodos, navegación, presets JSON, envío, asserts y guardado; rueda para formularios altos y opciones. Las posiciones se miden al recibir el evento y se ajustan al scroll. El parser admite secuencias fragmentadas e ignora eventos de mouse dentro de pegados delimitados. Se restauran mouse y pantalla al salir. Sin dependencias nuevas. Verificado con 432 tests y recorrido SGR en TTY: POST 201, YAML guardado y ejecutado correctamente; un doble clic de reintento no duplica requests.
+
+- 2026-11-11 — U4: `httpi new` agrega requests al flujo con Add request; el resumen permite Add another request o Save file. Las requests se guardan y ejecutan en el orden de creación. Cancelar una posterior conserva las anteriores en el resumen. Mismo secreto = misma variable; valores distintos reciben variables distintas sin colisionar con referencias existentes. `--name` conserva el nombre de test único y nombra el archivo en colecciones. Verificado con 437 tests y recorrido CLI real de dos requests (ambas pasaron); guardar no vuelve a enviarlas.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.

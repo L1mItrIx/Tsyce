@@ -4,6 +4,8 @@ import { existsSync } from 'node:fs';
 import { Command, InvalidArgumentError, Option } from 'commander';
 import { CurlExportError, exportCurl } from './core/exporter/curl.js';
 import {
+  defaultTestName,
+  prepareWizardFile,
   readEnvironment,
   readTestFile,
   readTextFile,
@@ -19,7 +21,7 @@ import { formatJUnit } from './core/reporter/junit.js';
 import { EXIT, type ExitCode, exitCodeFor, runTestFile } from './core/run.js';
 import { detectCurl } from './core/runner/detect.js';
 import { CurlUnavailableError, runRequest } from './core/runner/exec.js';
-import type { RequestSpec, TestFile } from './core/schema.js';
+import type { TestFile } from './core/schema.js';
 import { resolveVars, UnresolvedVariableError } from './core/vars.js';
 
 const say = (line: string) => process.stderr.write(`${line}\n`);
@@ -45,11 +47,6 @@ async function runCommand(path: string, options: RunOptions): Promise<ExitCode> 
 }
 
 type ImportOptions = { dialect?: Dialect; output?: string; name?: string; keepSecrets?: true };
-
-function defaultTestName(request: RequestSpec): string {
-  const path = URL.canParse(request.url) ? new URL(request.url).pathname : request.url;
-  return `${request.method} ${path}`;
-}
 
 async function importCommand(curlFile: string | undefined, options: ImportOptions): Promise<ExitCode> {
   if (curlFile === undefined && process.stdin.isTTY) {
@@ -86,13 +83,12 @@ async function newCommand(path: string, options: { name?: string }): Promise<Exi
   }
   if (existsSync(path)) throw new TestFileError(`${path}: file already exists; choose a new destination`);
   const curl = await detectCurl();
-  const { launchWizard } = await import('./tui/new-wizard.js');
+  const { launchWizard } = await import('./tui/suite-wizard.js');
   const completed = await launchWizard((request, signal) => runRequest(curl.bin, request, signal));
   if (completed === null) { say('httpi: cancelled; no file written'); return EXIT.ok; }
-  const { request, secrets } = extractSecrets(completed.request);
-  const file: TestFile = { version: 1, tests: [{ name: options.name ?? defaultTestName(request), request, expect: completed.expected }] };
+  const { file, secrets } = prepareWizardFile(completed, options.name);
   await writeTestFile(path, file);
-  say(`httpi: wrote ${path}`);
+  say(`httpi: wrote ${path} (${file.tests.length} ${file.tests.length === 1 ? 'request' : 'requests'})`);
   for (const secret of secrets) say(`secret: ${secret.header} replaced by {{${secret.variable}}}; run with --var ${secret.variable}=...`);
   return EXIT.ok;
 }
@@ -166,9 +162,9 @@ program
 
 program
   .command('new')
-  .description('create a test interactively: edit a request, send it once, select assertions and save YAML')
+  .description('create a test file interactively: add requests in order, select assertions and save one YAML')
   .argument('[file]', 'new YAML destination (never overwrites an existing file)', 'httpi.test.yaml')
-  .option('--name <name>', 'name of the generated test (default: method and path)')
+  .option('--name <name>', 'test name for one request, or file title for multiple requests')
   .action((path: string, options: { name?: string }) => finish(newCommand(path, options)));
 
 await program.parseAsync();

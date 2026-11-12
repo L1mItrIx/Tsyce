@@ -1,21 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
-import { Box, Text, render, useInput } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import type { RequestSpec, Expect } from '../core/schema.js';
 import type { RunResult } from '../core/runner/exec.js';
 import { RequestWizard } from './request-wizard.js';
 import { AssertionMenu } from './assertion-menu.js';
-import { MouseProvider, MouseTarget } from './mouse-controls.js';
+import { MouseTarget } from './mouse-controls.js';
 
-type SendRequest = (request: RequestSpec, signal: AbortSignal) => Promise<RunResult>;
-type Completed = { request: RequestSpec; expected: Expect };
+export type SendRequest = (request: RequestSpec, signal: AbortSignal) => Promise<RunResult>;
 type NewWizardProps = {
   sendRequest: SendRequest;
   onComplete: (request: RequestSpec, expected: Expect) => void;
   onCancel: () => void;
   onError?: (error: Error) => void;
+  actionLabel?: string;
 };
 
-export function NewWizard({ sendRequest, onComplete, onCancel, onError }: NewWizardProps) {
+export function NewWizard({ sendRequest, onComplete, onCancel, onError, actionLabel = 'Save test' }: NewWizardProps) {
   const [mode, setMode] = useState<'form' | 'running' | 'asserts' | 'error'>('form');
   const [request, setRequest] = useState<RequestSpec | null>(null);
   const [response, setResponse] = useState<RunResult | null>(null);
@@ -54,7 +54,7 @@ export function NewWizard({ sendRequest, onComplete, onCancel, onError }: NewWiz
     else if (mode === 'error' && key.escape) setMode('form');
   }, { isActive: mode === 'running' || mode === 'error' });
   if (mode === 'form') return <RequestWizard onComplete={(value) => { void send(value); }} onCancel={cancel} />;
-  if (mode === 'asserts' && response && request) return <AssertionMenu result={response} onCancel={cancel} onComplete={(expected) => {
+  if (mode === 'asserts' && response && request) return <AssertionMenu result={response} onCancel={cancel} actionLabel={actionLabel} onComplete={(expected) => {
     if (finished.current) return;
     finished.current = true; onComplete(request, expected);
   }} />;
@@ -69,20 +69,4 @@ export function NewWizard({ sendRequest, onComplete, onCancel, onError }: NewWiz
       <MouseTarget onClick={cancel}><Text>[ Cancel ]</Text></MouseTarget>
     </Box>
   </Box>;
-}
-
-/** Runs Ink on stderr so machine-readable output and saved YAML stay separate. */
-export async function launchWizard(sendRequest: SendRequest): Promise<Completed | null> {
-  let instance: ReturnType<typeof render> | undefined;
-  try {
-    return await new Promise<Completed | null>((resolve, reject) => {
-      instance = render(<MouseProvider><NewWizard sendRequest={sendRequest}
-        onComplete={(request, expected) => resolve({ request, expected })}
-        onCancel={() => resolve(null)} onError={reject} /></MouseProvider>,
-      { stdout: process.stderr, exitOnCtrlC: false, patchConsole: false, alternateScreen: true, interactive: true });
-    });
-  } finally {
-    instance?.unmount();
-    await instance?.waitUntilExit();
-  }
 }

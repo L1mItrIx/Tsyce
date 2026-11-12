@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import {
+  defaultTestName,
+  prepareWizardFile,
   parseTestFile,
   readEnvironment,
   readTestFile,
@@ -10,6 +12,34 @@ import {
   TestFileError,
   writeTestFile,
 } from '../../src/core/file.js';
+import { requestSchema, type TestCase } from '../../src/core/schema.js';
+
+const wizardCase = (token: string): TestCase => ({
+  name: 'GET /users', request: requestSchema.parse({ url: 'https://example.test/users', headers: { Authorization: `Bearer ${token}` } }), expect: { status: 200 },
+});
+
+test('wizard suites preserve request order and keep distinct credentials in distinct variables', () => {
+  const first = wizardCase('FAKE_FIRST'); const second = wizardCase('FAKE_SECOND');
+  const { file, secrets } = prepareWizardFile([first, second, first], 'Users flow');
+  expect(file.name).toBe('Users flow');
+  expect(file.tests.map((test) => test.request.headers.Authorization)).toEqual(['Bearer {{token}}', 'Bearer {{token2}}', 'Bearer {{token}}']);
+  expect(secrets.map((secret) => secret.variable)).toEqual(['token', 'token2']);
+  expect(JSON.stringify({ file, secrets })).not.toContain('FAKE_');
+  expect(first.request.headers.Authorization).toBe('Bearer FAKE_FIRST');
+  expect(parseTestFile(stringifyTestFile(file), 'wizard')).toEqual(file);
+});
+
+test('single-request naming remains compatible and generated variables do not collide with explicit references', () => {
+  const first = wizardCase('{{token}}'); const second = wizardCase('FAKE_SECRET');
+  expect(prepareWizardFile([first], 'Named request').file.tests[0]!.name).toBe('Named request');
+  expect(prepareWizardFile([first, second]).file.tests[1]!.request.headers.Authorization).toBe('Bearer {{token2}}');
+  expect(defaultTestName(second.request)).toBe('GET /users');
+});
+
+test('wizard files reject empty collections and empty explicit names', () => {
+  expect(() => prepareWizardFile([])).toThrow(TestFileError);
+  expect(() => prepareWizardFile([wizardCase('FAKE')], ' ')).toThrow('name must not be empty');
+});
 
 const PLAN_EXAMPLE_YAML = `
 version: 1

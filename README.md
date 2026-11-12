@@ -54,9 +54,24 @@ httpi new usuarios.yaml --name "Consultar usuarios"
 2. Añade headers, uno por línea. En headers y body, Enter añade una línea y Tab avanza.
 3. Revisa y confirma. Solo entonces se envía la request **una vez**, incluso si es POST o DELETE.
 4. Selecciona asserts con ↑/↓ y espacio. El status recibido está seleccionado inicialmente.
-   `t` permite escribir un límite de tiempo en ms. Enter guarda el YAML.
+   `t` permite escribir un límite de tiempo en ms. **Add request** o Enter añade esa request al flujo.
+5. En el resumen, elige **Add another request** (tecla `a`) para configurar la siguiente.
+   Repite las veces necesarias. **Save file** o Enter guarda todas en el mismo YAML y en el orden mostrado.
 
-Esc vuelve a la pantalla anterior; Ctrl+C cancela y detiene curl. Si falla la red,
+```bash
+httpi new flujo-usuarios.yaml --name "Flujo de usuarios"
+# Configura la primera request → Add request → Add another request → configura la siguiente.
+httpi run flujo-usuarios.yaml --show-response
+```
+
+Durante la creación se envía cada request una vez, tras confirmarla, para proponer
+asserts. Agregar otra o guardar no vuelve a ejecutar las anteriores. Al usar `run`
+se ejecuta nuevamente el flujo completo. `--name` nombra el test si solo hay una
+request, o el archivo si hay varias.
+
+Esc vuelve a la pantalla anterior; Ctrl+C cancela la request actual y detiene curl.
+Si ya agregaste otras, vuelve al resumen y las conserva; **Discard file** o Ctrl+C
+en ese resumen descarta todo sin escribir. Si falla la red,
 puedes reintentar o volver a editar. El asistente requiere una terminal interactiva
 y nunca sobrescribe un archivo existente. La selección ofrece status, tiempo,
 headers y comparadores JSON (`exists`, `type`, `equals`, `contains`, `matches`).
@@ -67,7 +82,8 @@ En respuestas grandes se limita la lista para mantener manejable el menú.
 En Windows Terminal, la terminal de VS Code u otra terminal compatible con mouse
 SGR, puedes hacer clic en los métodos y en los botones **Next**, **Back**, **Cancel**
 y **Send request**. En la respuesta, haz clic en los asserts para marcarlos y en
-**Save test** para guardar. La rueda desplaza el formulario si no cabe en la ventana
+**Add request** para agregarla al flujo. En el resumen, usa **Add another request**
+para continuar o **Save file** para escribir el YAML. La rueda desplaza el formulario si no cabe en la ventana
 y recorre las opciones del menú de asserts. El asistente usa una pantalla alternativa
 y restaura la terminal al salir. El teclado sigue funcionando; Shift permite usar la
 selección de texto propia de las terminales que ofrecen ese atajo.
@@ -82,6 +98,10 @@ necesita headers: haz clic en **Skip headers**.
 El formulario incluye **Add JSON header** y **Use JSON example**; este último añade
 `Content-Type: application/json` si no lo habías definido. El ejemplo es editable:
 debes adaptarlo a los campos que espera tu API.
+
+En un flujo, el mismo secreto reutiliza su variable; credenciales diferentes usan
+variables distintas (`{{token}}`, `{{token2}}`, etc.). httpi indica los nombres al
+guardar, sin imprimir los valores. Proporciónalos con `--var` al ejecutar el archivo.
 
 Seleccionar un método, añadir un ejemplo o avanzar no envía nada. Solo **Send request**
 o Enter en la pantalla de confirmación realiza la llamada.

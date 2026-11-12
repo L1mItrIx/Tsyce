@@ -5,9 +5,9 @@ import type { RunResult } from '../core/runner/exec.js';
 import { assertionChoices, selectedExpectations } from './assertion-choices.js';
 import { MouseTarget } from './mouse-controls.js';
 
-export type AssertionMenuProps = { result: RunResult; onComplete: (expected: Expect) => void; onCancel: () => void };
+export type AssertionMenuProps = { result: RunResult; onComplete: (expected: Expect) => void; onCancel: () => void; actionLabel?: string };
 
-export function AssertionMenu({ result, onComplete, onCancel }: AssertionMenuProps) {
+export function AssertionMenu({ result, onComplete, onCancel, actionLabel = 'Save test' }: AssertionMenuProps) {
   const choices = useMemo(() => assertionChoices(result), [result]);
   const [cursor, setCursor] = useState(0);
   const [selected, setSelected] = useState(new Set(choices.length > 0 ? [0] : []));
@@ -60,12 +60,12 @@ export function AssertionMenu({ result, onComplete, onCancel }: AssertionMenuPro
         <Text>{start + i === cursor ? '>' : ' '} [{selected.has(start + i) ? 'x' : ' '}] {choice.label}</Text>
       </MouseTarget>)}
     </MouseTarget>
-    <Text dimColor>↑/↓: move · Space: toggle · t: time limit · Enter: save · Ctrl+C: cancel</Text>
+    <Text dimColor>↑/↓: move · Space: toggle · t: time limit · Enter: {actionLabel.toLowerCase()} · Ctrl+C: cancel</Text>
     <Text dimColor>{selected.size} selected · {choices.length} available{choices.length >= 190 ? ' (response options limited)' : ''}</Text>
     {maxTimeMs !== undefined && <Text>Custom time limit: {maxTimeMs} ms</Text>}
     {time !== null && <Text>Maximum time in ms: {time}▌</Text>}
     <Box gap={2} flexWrap="wrap">
-      <MouseTarget onClick={complete} disabled={time !== null}><Text color="cyan">[ Save test ]</Text></MouseTarget>
+      <MouseTarget onClick={complete} disabled={time !== null}><Text color="cyan">[ {actionLabel} ]</Text></MouseTarget>
       <MouseTarget onClick={() => { if (time === null) setTime(''); else applyTime(); }}>
         <Text>[ {time === null ? 'Time limit' : 'Apply time'} ]</Text>
       </MouseTarget>

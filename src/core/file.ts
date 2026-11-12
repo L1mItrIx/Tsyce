@@ -3,13 +3,45 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { z } from 'zod';
-import { envFileSchema, type TestFile, testFileSchema } from './schema.js';
+import { envFileSchema, type RequestSpec, type TestCase, type TestFile, testFileSchema } from './schema.js';
+import { extractSecrets, type Secret } from './importer/map-flags.js';
 
 export const ENV_FILE_NAME = 'httpi.env.yaml';
 
 /** A file cannot be used: unreadable, not YAML/JSON, or it does not match its schema. */
 export class TestFileError extends Error {
   override name = 'TestFileError';
+}
+
+export function defaultTestName(request: RequestSpec): string {
+  const path = URL.canParse(request.url) ? new URL(request.url).pathname : request.url;
+  return `${request.method} ${path}`;
+}
+
+/** Creates the wizard file without persisting credentials or conflating distinct auth values. */
+export function prepareWizardFile(tests: TestCase[], name?: string): { file: TestFile; secrets: Pick<Secret, 'header' | 'variable'>[] } {
+  if (tests.length === 0) throw new TestFileError('Add at least one request before saving.');
+  if (name !== undefined && name.trim() === '') throw new TestFileError('The test name must not be empty.');
+  const used = new Set([...JSON.stringify(tests).matchAll(/\{\{([^{}]+)\}\}/g)].map((match) => match[1]!.trim()));
+  const bindings = new Map<string, string>();
+  const secrets: Pick<Secret, 'header' | 'variable'>[] = [];
+  const prepared = tests.map((test) => {
+    const extracted = extractSecrets(test.request);
+    for (const secret of extracted.secrets) {
+      const key = JSON.stringify([secret.variable, secret.value]);
+      let variable = bindings.get(key);
+      if (variable === undefined) {
+        variable = secret.variable;
+        for (let suffix = 2; used.has(variable); suffix++) variable = `${secret.variable}${suffix}`;
+        used.add(variable); bindings.set(key, variable);
+        secrets.push({ header: secret.header, variable });
+      }
+      extracted.request.headers[secret.header] = extracted.request.headers[secret.header]!
+        .replace(`{{${secret.variable}}}`, `{{${variable}}}`);
+    }
+    return { ...test, name: tests.length === 1 && name !== undefined ? name : test.name, request: extracted.request };
+  });
+  return { file: { version: 1, ...(name !== undefined && tests.length > 1 ? { name } : {}), tests: prepared }, secrets };
 }
 
 function parseWith<T>(schema: z.ZodType<T>, text: string, source: string, kind: string): T {
