@@ -71,6 +71,27 @@ test('a JSON test file works the same', async () => {
   expect(result.code).toBe(0);
 });
 
+test('--show-response runs a file without prompting and displays its response and assertions', async () => {
+  for (const expectedStatus of [200, 201]) {
+    const yaml = passingYaml().replace('status: 200', `status: ${expectedStatus}`);
+    const result = await httpi(['run', await testFile(`response-${expectedStatus}.yaml`, yaml), '--show-response']);
+    expect(result.code).toBe(expectedStatus === 200 ? 0 : 1);
+    expect(result.stdout).toContain('Response: HTTP 200');
+    expect(result.stdout).toContain('content-type: application/json');
+    expect(result.stdout).toContain('"id": 7');
+    expect(result.stdout).toContain('"name": "Ana"');
+    expect(result.stdout).toContain('status is');
+    expect(result.stderr).toBe('');
+  }
+});
+
+test('response output is rejected with JUnit so XML stays machine-readable', async () => {
+  const result = await httpi(['run', await testFile('response-junit.yaml', passingYaml()), '--reporter', 'junit', '--show-response']);
+  expect(result.code).toBe(2);
+  expect(result.stdout).toBe('');
+  expect(result.stderr).toContain('--show-response requires --reporter pretty');
+});
+
 test('exit 1 when an assert fails', async () => {
   const yaml = `
 version: 1

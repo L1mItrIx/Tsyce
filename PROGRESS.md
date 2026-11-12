@@ -52,7 +52,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 
 ## Mejoras solicitadas por el usuario
 - [x] U1 Selector visual de métodos HTTP y marco de terminal; commit `U1: add visual HTTP method selection to the request wizard`.
-- [ ] U2 Ejecución de archivos con respuestas visibles y ejemplo GET/POST por ambiente.
+- [x] U2 Ejecución de archivos con respuestas visibles y ejemplo GET/POST por ambiente; commit `U2: show API responses when running request files`.
 
 ## Decisiones
 Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
@@ -89,6 +89,8 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-11 — CI F5.4: las pruebas de Ink leían callbacks tras una espera fija; se cambia a esperar la condición `toHaveBeenCalledOnce` sin subir timeouts, saltar tests ni relajar asserts. La espera de callbacks no bastó en CI; se usa además `act()` para vaciar los efectos pasivos antes de escribir teclas (la pantalla visible precede a la suscripción de entrada). Verificación local: 414 tests; CI corregida: seis jobs en verde sobre `8cd1e48` (Ubuntu/macOS/Windows × Node 22/24).
 
 - 2026-11-11 — F7.4: nombre `httpi-cli`, versión 0.1.0 y bin `httpi`; prepack ejecuta check. Tarball verificado: 29 archivos, ~28 kB; instalación aislada con dependencias de producción, `run --reporter junit` y asistente Ink probados. El usuario decide dejar la publicación npm pendiente; no se ha publicado. F6.2 (`fetch`) continúa opcional y pendiente.
+
+- 2026-11-11 — U1/U2 solicitadas explícitamente por el usuario: métodos visibles con selección por flechas y marco de terminal inspirado en la referencia; `run --show-response` muestra status, headers repetidos y body junto a los asserts sin interacción. JUnit rechaza ese flag con salida 2. `examples/requests.yaml` contiene GET y POST contra el servidor local, que responde al POST sin persistir. Verificado con 422 tests, navegación en TTY y ejecución real del archivo (2 tests pasaron).
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.

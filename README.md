@@ -84,6 +84,7 @@ Otros headers, cuerpos y parámetros de URL pueden contener secretos: revisa el 
 ```bash
 httpi run usuarios.yaml
 httpi run usuarios.yaml --env dev --var token=valor
+httpi run usuarios.yaml --env dev --show-response
 httpi run usuarios.yaml --reporter junit > results.xml
 ```
 
@@ -125,6 +126,30 @@ en el archivo: pueden quedar tapados por las variables del sistema.
 
 Las requests se ejecutan en orden. Un HTTP 404 es una respuesta: solo falla si
 contradice los asserts. Los errores de red tienen prioridad sobre los asserts fallidos.
+
+### Ejecutar un archivo completo sin pasos manuales
+
+Guarda todas las requests en el arreglo `tests` del YAML. Al ejecutar el archivo,
+httpi carga el ambiente, envía cada request en orden y comprueba sus asserts sin
+abrir el asistente ni pedir confirmaciones:
+
+```bash
+httpi run examples/requests.yaml --env dev --show-response
+```
+
+[examples/requests.yaml](examples/requests.yaml) contiene un GET y un POST listos
+para la API local de ejemplo. Iníciala primero con `node examples/server.mjs`.
+El POST de esta API es una respuesta de demostración: no persiste usuarios ni cambia el GET.
+
+`--show-response` muestra el status, todos los headers y el body de cada respuesta,
+con JSON formateado, además del resultado de los asserts. También muestra respuestas
+con asserts fallidos; un error de red se informa como tal. Los caracteres de control
+se muestran escapados para que una respuesta no modifique la terminal. Usa este flag
+cuando quieras inspeccionar el contenido; puede mostrar datos sensibles de tu API.
+No se combina con `--reporter junit`, que genera solo XML.
+
+Puedes definir más ambientes en `httpi.env.yaml` y cambiar solo `--env`, o pasar
+`--var baseUrl=https://tu-api-de-pruebas.example` sin modificar las requests.
 
 ## Exportar curl
 

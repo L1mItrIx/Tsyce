@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=../schema/httpi.schema.json
+version: 1
+name: Pruebas de ambiente — GET y POST
+tests:
+  - name: GET /users — consultar usuarios
+    request:
+      method: GET
+      url: "{{baseUrl}}/users"
+    expect:
+      status: 200
+      json:
+        - { path: "$.users[0].name", equals: Ana }
+  - name: POST /users — crear usuario
+    request:
+      method: POST
+      url: "{{baseUrl}}/users"
+      body:
+        json: { name: Lucia }
+    expect:
+      status: 201
+      headers:
+        content-type: { contains: application/json }
+      json:
+        - { path: "$.id", type: number }
+        - { path: "$.name", equals: Lucia }

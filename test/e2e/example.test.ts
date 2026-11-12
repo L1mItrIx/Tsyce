@@ -21,5 +21,14 @@ test('the README example runs against the supplied local API', async () => {
     const result = await httpi(['run', fileURLToPath(new URL('../../examples/users.yaml', import.meta.url)), '--env', 'dev', '--var', `baseUrl=${url}`]);
     expect(result.code).toBe(0);
     expect(result.stdout).toContain('1 passed');
+    const batch = await httpi(['run', fileURLToPath(new URL('../../examples/requests.yaml', import.meta.url)), '--env', 'dev', '--var', `baseUrl=${url}`, '--show-response']);
+    expect(batch.code).toBe(0);
+    expect(batch.stdout).toContain('GET /users');
+    expect(batch.stdout).toContain('POST /users');
+    expect(batch.stdout.indexOf('GET /users')).toBeLessThan(batch.stdout.indexOf('POST /users'));
+    expect(batch.stdout).toContain('Response: HTTP 200');
+    expect(batch.stdout).toContain('Response: HTTP 201');
+    expect(batch.stdout).toContain('"name": "Lucia"');
+    expect(batch.stdout).toContain('2 tests: 2 passed');
   } finally { server.kill(); }
 });

@@ -56,3 +56,30 @@ test('color only adds ANSI codes around the same text', () => {
   expect(colored).toContain('\u001B[31m');
   expect(colored.replace(/\u001B\[\d+m/g, '')).toBe(formatPretty('Users API', outcomes, { color: false }));
 });
+
+test('response mode includes status, repeated headers and a readable JSON body even for failed assertions', () => {
+  const response: TestOutcome = { ...outcomes[1]!, result: { ...outcomes[1]!.result, headers: { 'content-type': ['application/json'], 'x-multi': ['one', 'two'] }, body: '{"error":"Not found"}' } };
+  const report = formatPretty(undefined, [response], { color: false, showResponse: true });
+  expect(report).toContain('Response: HTTP 404');
+  expect(report).toContain('content-type: application/json');
+  expect(report).toContain('x-multi: one');
+  expect(report).toContain('x-multi: two');
+  expect(report).toContain('"error": "Not found"');
+  expect(report).toContain('1 test: 0 passed, 1 failed');
+  expect(formatPretty(undefined, [response], { color: false })).not.toContain('Response:');
+});
+
+test('plain text, empty bodies and terminal control characters are represented safely', () => {
+  const raw = { ...outcomes[0]!, result: { ...outcomes[0]!.result, body: 'hello\r\n\u001b[2J\0world' } };
+  const report = formatPretty(undefined, [raw, outcomes[0]!], { color: false, showResponse: true });
+  expect(report).toContain('hello\n');
+  expect(report).toContain('\\x1b[2J\\x00world');
+  expect(report).not.toContain('\u001b');
+  expect(report).not.toContain('\0');
+  expect(report).toContain('(empty)');
+});
+
+test('response formatting preserves large numeric IDs instead of rounding them', () => {
+  const response = { ...outcomes[0]!, result: { ...outcomes[0]!.result, body: '{"id":9007199254740993}' } };
+  expect(formatPretty(undefined, [response], { color: false, showResponse: true })).toContain('9007199254740993');
+});

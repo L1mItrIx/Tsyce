@@ -25,9 +25,12 @@ import { resolveVars, UnresolvedVariableError } from './core/vars.js';
 const say = (line: string) => process.stderr.write(`${line}\n`);
 
 type VariableOptions = { env?: string; var: Record<string, string> };
-type RunOptions = VariableOptions & { reporter: 'pretty' | 'junit' };
+type RunOptions = VariableOptions & { reporter: 'pretty' | 'junit'; showResponse?: true };
 
 async function runCommand(path: string, options: RunOptions): Promise<ExitCode> {
+  if (options.showResponse && options.reporter !== 'pretty') {
+    throw new TestFileError('--show-response requires --reporter pretty; omit it when generating JUnit');
+  }
   const file = resolveVars(await readTestFile(path), {
     cli: options.var,
     system: process.env,
@@ -36,7 +39,7 @@ async function runCommand(path: string, options: RunOptions): Promise<ExitCode> 
   const curl = await detectCurl();
   const outcomes = await runTestFile(file, curl.bin);
   const color = process.stdout.isTTY === true && !process.env.NO_COLOR;
-  const report = options.reporter === 'junit' ? formatJUnit(file.name, outcomes) : formatPretty(file.name, outcomes, { color });
+  const report = options.reporter === 'junit' ? formatJUnit(file.name, outcomes) : formatPretty(file.name, outcomes, { color, showResponse: options.showResponse === true });
   process.stdout.write(`${report}\n`);
   return exitCodeFor(outcomes);
 }
@@ -137,6 +140,7 @@ program
   .description('run the tests in a file; exit 0 = pass, 1 = assert failed, 2 = invalid file or usage, 3 = curl or network error')
   .argument('<file>', 'test file (YAML or JSON)')
   .addOption(new Option('--reporter <format>', 'output format').choices(['pretty', 'junit']).default('pretty'))
+  .option('--show-response', 'show response status, headers and body for each request (pretty reporter)')
   .option('--env <name>', 'environment from httpi.env.yaml')
   .option('--var <name=value>', 'set a variable; repeatable, wins over the environment', collectVar, {})
   .action((path: string, options: RunOptions) => finish(runCommand(path, options)));
