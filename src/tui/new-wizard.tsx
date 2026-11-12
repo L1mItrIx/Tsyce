@@ -1,25 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
-import type { RequestSpec, Expect } from '../core/schema.js';
+import type { RequestSpec, Expect, Capture } from '../core/schema.js';
+import { captureAuthToken, maskSecrets, responseTokenFields } from '../core/capture.js';
+import { checkExpectations } from '../core/asserts.js';
 import type { RunResult } from '../core/runner/exec.js';
 import { RequestWizard } from './request-wizard.js';
 import { AssertionMenu } from './assertion-menu.js';
 import { MouseTarget } from './mouse-controls.js';
+import { TokenPicker } from './token-picker.js';
 
 export type SendRequest = (request: RequestSpec, signal: AbortSignal) => Promise<RunResult>;
+export type CapturedAuth = { capture: Capture; value: string };
 type NewWizardProps = {
   sendRequest: SendRequest;
-  onComplete: (request: RequestSpec, expected: Expect) => void;
+  onComplete: (request: RequestSpec, expected: Expect, auth?: CapturedAuth) => void;
   onCancel: () => void;
   onError?: (error: Error) => void;
   actionLabel?: string;
+  hasCapturedToken?: boolean;
+  sensitiveValues?: string[];
 };
 
-export function NewWizard({ sendRequest, onComplete, onCancel, onError, actionLabel = 'Save test' }: NewWizardProps) {
-  const [mode, setMode] = useState<'form' | 'running' | 'asserts' | 'error'>('form');
+export function NewWizard({ sendRequest, onComplete, onCancel, onError, actionLabel = 'Save test', hasCapturedToken = false, sensitiveValues = [] }: NewWizardProps) {
+  const [mode, setMode] = useState<'form' | 'running' | 'asserts' | 'error' | 'token'>('form');
   const [request, setRequest] = useState<RequestSpec | null>(null);
   const [response, setResponse] = useState<RunResult | null>(null);
   const [error, setError] = useState('');
+  const [auth, setAuth] = useState<CapturedAuth | null>(null);
   const controller = useRef(new AbortController());
   const finished = useRef(false);
   const sending = useRef(false);
@@ -37,7 +44,7 @@ export function NewWizard({ sendRequest, onComplete, onCancel, onError, actionLa
     try {
       const result = await sendRequest(value, controller.current.signal);
       if (finished.current) return;
-      if (result.error !== null) { setError(result.error); setMode('error'); }
+      if (result.error !== null) { setError(maskSecrets(result.error, sensitiveValues)); setMode('error'); }
       else { setResponse(result); setMode('asserts'); }
     } catch (cause) {
       if (finished.current) return;
@@ -53,10 +60,20 @@ export function NewWizard({ sendRequest, onComplete, onCancel, onError, actionLa
     else if (mode === 'error' && key.return && request) void send(request);
     else if (mode === 'error' && key.escape) setMode('form');
   }, { isActive: mode === 'running' || mode === 'error' });
-  if (mode === 'form') return <RequestWizard onComplete={(value) => { void send(value); }} onCancel={cancel} />;
-  if (mode === 'asserts' && response && request) return <AssertionMenu result={response} onCancel={cancel} actionLabel={actionLabel} onComplete={(expected) => {
+  if (mode === 'form') return <RequestWizard hasCapturedToken={hasCapturedToken} onComplete={(value) => { void send(value); }} onCancel={cancel} />;
+  if (mode === 'token' && response) return <TokenPicker result={response} onBack={() => setMode('asserts')} onCancel={cancel} onSelect={(path) => {
+    const capture = { authToken: path };
+    setAuth({ capture, value: captureAuthToken(response, capture) });
+    setMode('asserts');
+  }} />;
+  if (mode === 'asserts' && response && request) return <AssertionMenu key={auth?.capture.authToken ?? 'no-capture'}
+    result={maskSecrets(response, [...sensitiveValues, ...(auth ? [auth.value] : [])])} onCancel={cancel} actionLabel={actionLabel}
+    {...(responseTokenFields(response).length > 0 ? { onCapture: () => setMode('token') } : {})}
+    {...(auth ? { tokenPath: auth.capture.authToken, validate: (expected: Expect) => checkExpectations(expected, response).every((assert) => assert.ok) ? null : 'Authentication assertions must pass before reusing this token.' } : {})}
+    onComplete={(expected) => {
     if (finished.current) return;
-    finished.current = true; onComplete(request, expected);
+    finished.current = true;
+    if (auth) onComplete(request, expected, auth); else onComplete(request, expected);
   }} />;
   return <Box flexDirection="column">
     <Text>{mode === 'running' ? 'Sending request… Ctrl+C: cancel' : `Request failed: ${JSON.stringify(error)}`}</Text>

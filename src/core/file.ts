@@ -77,12 +77,13 @@ export async function readTestFile(path: string): Promise<TestFile> {
 
 /** YAML for a test file, leaving out what the schema fills in by default (no headers, no asserts). */
 export function stringifyTestFile(file: TestFile): string {
-  const tests = file.tests.map(({ name, request, expect }) => {
+  const tests = file.tests.map(({ name, request, expect, capture }) => {
     const { method, url, headers, ...rest } = request;
     return {
       name,
       request: { method, url, ...(Object.keys(headers).length > 0 && { headers }), ...rest },
       ...(Object.keys(expect).length > 0 && { expect }),
+      ...(capture ? { capture } : {}),
     };
   });
   // Single quotes keep JSON bodies readable: '{"a":1}' instead of "{\"a\":1}".

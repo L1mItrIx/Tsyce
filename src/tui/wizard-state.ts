@@ -9,7 +9,7 @@ const wizardStateSchema = z.object({
 });
 export type WizardState = z.infer<typeof wizardStateSchema>;
 export type WizardAction = { type: 'input'; value: string } | { type: 'next' | 'back' | 'cancel' }
-  | { type: 'move-method'; direction: -1 | 1 } | { type: 'json-example' };
+  | { type: 'move-method'; direction: -1 | 1 } | { type: 'json-example' | 'use-captured-token' };
 
 export function createWizardState(): WizardState {
   return { step: 'method', input: '', error: null, request: { method: 'GET', url: '', headers: {} } };
@@ -49,6 +49,11 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
   if (state.step === 'ready' || state.step === 'cancelled') return state;
   if (action.type === 'cancel') return { ...state, step: 'cancelled', error: null };
   if (action.type === 'input') return { ...state, input: action.value, error: null };
+  if (action.type === 'use-captured-token') {
+    if (state.step !== 'headers') return state;
+    const lines = state.input.split(/\r?\n/).filter((line) => line.trim() !== '' && !/^\s*authorization\s*:/i.test(line));
+    return { ...state, input: [...lines, 'Authorization: Bearer {{authToken}}'].join('\n'), error: null };
+  }
   if (action.type === 'json-example') {
     if (state.step !== 'body') return state;
     const hasContentType = Object.keys(state.request.headers).some((name) => name.toLowerCase() === 'content-type');

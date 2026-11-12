@@ -16,6 +16,7 @@ function visible(text: string): string {
 
 function formatResponse(outcome: TestOutcome): string[] {
   const { result } = outcome;
+  if (outcome.responseHidden) return [`    Response: HTTP ${result.status}`, '      Authentication response hidden (token kept in memory only)'];
   const lines = [`    Response: HTTP ${result.status}`, '      Headers:'];
   const headers = Object.entries(result.headers).flatMap(([name, values]) => values.map((value) => `${name}: ${value}`));
   for (const header of headers.length > 0 ? headers : ['(none)']) {

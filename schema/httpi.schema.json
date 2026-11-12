@@ -262,6 +262,18 @@
               }
             },
             "additionalProperties": false
+          },
+          "capture": {
+            "type": "object",
+            "properties": {
+              "authToken": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "authToken"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [

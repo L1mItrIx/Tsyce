@@ -87,3 +87,10 @@ test('the JSON body preset adds the required content type without overwriting an
   expect(wizardReducer(custom, { type: 'json-example' }).request.headers).toEqual(custom.request.headers);
   expect(wizardReducer(createWizardState(), { type: 'json-example' }).step).toBe('method');
 });
+
+test('captured-token header replaces manual Authorization without exposing the token or duplicating headers', () => {
+  const state = { ...createWizardState(), step: 'headers' as const, input: 'X-Test: yes\nauthorization: old' };
+  const next = wizardReducer(state, { type: 'use-captured-token' });
+  expect(next.input).toBe('X-Test: yes\nAuthorization: Bearer {{authToken}}');
+  expect(wizardReducer(next, { type: 'use-captured-token' }).input).toBe(next.input);
+});

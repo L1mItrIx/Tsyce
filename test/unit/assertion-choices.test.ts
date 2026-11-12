@@ -31,3 +31,9 @@ test('limits options for large responses and never renders raw terminal control 
   expect(choices.length).toBeLessThanOrEqual(200);
   expect(choices.every((choice) => !choice.label.includes('\u001b'))).toBe(true);
 });
+
+test('token fields offer exists/type checks but never literal token assertions', () => {
+  const choices = assertionChoices({ ...result, body: '{"access_token":"SECRET_VALUE","refresh_token":null}' });
+  expect(JSON.stringify(choices)).not.toContain('SECRET_VALUE');
+  expect(choices.some((choice) => choice.expect.json?.some((rule) => rule.path.includes('access_token') && 'exists' in rule))).toBe(true);
+});

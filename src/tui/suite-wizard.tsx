@@ -4,12 +4,15 @@ import type { TestCase } from '../core/schema.js';
 import { defaultTestName } from '../core/file.js';
 import { NewWizard, type SendRequest } from './new-wizard.js';
 import { MouseProvider, MouseTarget } from './mouse-controls.js';
+import { resolveVars } from '../core/vars.js';
+import { maskSecrets } from '../core/capture.js';
 
 type SuiteWizardProps = { sendRequest: SendRequest; onComplete: (tests: TestCase[]) => void; onCancel: () => void; onError?: (error: Error) => void };
 
 export function SuiteWizard({ sendRequest, onComplete, onCancel, ...options }: SuiteWizardProps) {
   const [tests, setTests] = useState<TestCase[]>([]);
   const [editing, setEditing] = useState(true);
+  const [token, setToken] = useState<string | null>(null);
   const finished = useRef(false);
   const cancel = () => { if (!finished.current) { finished.current = true; onCancel(); } };
   const save = () => { if (!finished.current && tests.length > 0) { finished.current = true; onComplete(tests); } };
@@ -19,15 +22,22 @@ export function SuiteWizard({ sendRequest, onComplete, onCancel, ...options }: S
     else if (input.toLowerCase() === 'a') addAnother();
     else if (key.return) save();
   }, { isActive: !editing });
-  if (editing) return <NewWizard key={tests.length} sendRequest={sendRequest} {...options} actionLabel="Add request"
-    onComplete={(request, expected) => {
-      setTests((previous) => [...previous, { name: defaultTestName(request), request, expect: expected }]);
+  if (editing) return <NewWizard key={tests.length} hasCapturedToken={token !== null} sensitiveValues={token ? [token] : []}
+    sendRequest={async (request, signal) => {
+      const resolved = resolveVars(request, { cli: {}, system: process.env, file: {}, runtime: { authToken: token ?? undefined } });
+      try { return await sendRequest(resolved, signal); }
+      catch (cause) { throw new Error(maskSecrets((cause as Error).message, token ? [token] : [])); }
+    }} {...options} actionLabel="Add request"
+    onComplete={(request, expected, auth) => {
+      setTests((previous) => [...previous, { name: defaultTestName(request), request, expect: expected, ...(auth ? { capture: auth.capture } : {}) }]);
+      if (auth) setToken(auth.value);
       setEditing(false);
     }} onCancel={() => { if (tests.length > 0) setEditing(false); else cancel(); }} />;
   return <Box flexDirection="column">
     <Text bold>{tests.length} {tests.length === 1 ? 'request' : 'requests'} ready</Text>
     <Text>Requests will run in this order:</Text>
     {tests.map((test, index) => <Text key={index}>{index + 1}. {test.name}</Text>)}
+    {token !== null && <Text color="green">Captured auth token ready — value hidden. Use it in the next request's Headers.</Text>}
     <Text dimColor>Each request was sent once to choose assertions. Saving only writes the YAML.</Text>
     <Box gap={2} marginTop={1} flexWrap="wrap">
       <MouseTarget onClick={addAnother}><Text color="cyan">[ Add another request ]</Text></MouseTarget>

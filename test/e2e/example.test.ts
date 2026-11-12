@@ -30,5 +30,8 @@ test('the README example runs against the supplied local API', async () => {
     expect(batch.stdout).toContain('Response: HTTP 201');
     expect(batch.stdout).toContain('"name": "Lucia"');
     expect(batch.stdout).toContain('2 tests: 2 passed');
+    const auth = await httpi(['run', fileURLToPath(new URL('../../examples/auth.yaml', import.meta.url)), '--env', 'dev', '--var', `baseUrl=${url}`, '--show-response']);
+    expect(auth.code).toBe(0); expect(auth.stdout).toContain('2 tests: 2 passed');
+    expect(auth.stdout).not.toContain('demo_token_');
   } finally { server.kill(); }
 });

@@ -5,9 +5,10 @@ import type { RunResult } from '../core/runner/exec.js';
 import { assertionChoices, selectedExpectations } from './assertion-choices.js';
 import { MouseTarget } from './mouse-controls.js';
 
-export type AssertionMenuProps = { result: RunResult; onComplete: (expected: Expect) => void; onCancel: () => void; actionLabel?: string };
+export type AssertionMenuProps = { result: RunResult; onComplete: (expected: Expect) => void; onCancel: () => void; actionLabel?: string;
+  onCapture?: () => void; tokenPath?: string; validate?: (expected: Expect) => string | null };
 
-export function AssertionMenu({ result, onComplete, onCancel, actionLabel = 'Save test' }: AssertionMenuProps) {
+export function AssertionMenu({ result, onComplete, onCancel, actionLabel = 'Save test', onCapture, tokenPath, validate }: AssertionMenuProps) {
   const choices = useMemo(() => assertionChoices(result), [result]);
   const [cursor, setCursor] = useState(0);
   const [selected, setSelected] = useState(new Set(choices.length > 0 ? [0] : []));
@@ -27,9 +28,12 @@ export function AssertionMenu({ result, onComplete, onCancel, actionLabel = 'Sav
   };
   const complete = () => {
     if (finished.current || time !== null) return;
-    finished.current = true;
     const expected = selectedExpectations(choices, [...selected].sort((a, b) => a - b));
-    onComplete(maxTimeMs === undefined ? expected : { ...expected, maxTimeMs });
+    const final = maxTimeMs === undefined ? expected : { ...expected, maxTimeMs };
+    const problem = validate?.(final);
+    if (problem) { setError(problem); return; }
+    finished.current = true;
+    onComplete(final);
   };
   const applyTime = () => {
     const value = Number(time);
@@ -47,6 +51,7 @@ export function AssertionMenu({ result, onComplete, onCancel, actionLabel = 'Sav
       return;
     }
     if (input === 't') setTime('');
+    else if (input === 'c' && onCapture) onCapture();
     else if (key.upArrow) setCursor(Math.max(0, cursor - 1));
     else if (key.downArrow) setCursor(Math.min(choices.length - 1, cursor + 1));
     else if (input === ' ') toggle(cursor);
@@ -64,12 +69,16 @@ export function AssertionMenu({ result, onComplete, onCancel, actionLabel = 'Sav
     <Text dimColor>{selected.size} selected · {choices.length} available{choices.length >= 190 ? ' (response options limited)' : ''}</Text>
     {maxTimeMs !== undefined && <Text>Custom time limit: {maxTimeMs} ms</Text>}
     {time !== null && <Text>Maximum time in ms: {time}▌</Text>}
+    {tokenPath !== undefined && <Text color="green">Token selected: {tokenPath} — value hidden; reusable in following requests.</Text>}
     <Box gap={2} flexWrap="wrap">
       <MouseTarget onClick={complete} disabled={time !== null}><Text color="cyan">[ {actionLabel} ]</Text></MouseTarget>
       <MouseTarget onClick={() => { if (time === null) setTime(''); else applyTime(); }}>
         <Text>[ {time === null ? 'Time limit' : 'Apply time'} ]</Text>
       </MouseTarget>
       <MouseTarget onClick={cancel}><Text>[ Cancel ]</Text></MouseTarget>
+      {onCapture && <MouseTarget onClick={onCapture} disabled={time !== null}>
+        <Text color="cyan">[ {tokenPath === undefined ? 'Use response token' : 'Change response token'} ]</Text>
+      </MouseTarget>}
     </Box>
     <Text dimColor>Click an assertion to toggle · Mouse wheel: scroll</Text>
     {error !== null && <Text color="red">{error}</Text>}

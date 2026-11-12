@@ -106,6 +106,44 @@ guardar, sin imprimir los valores. Proporciónalos con `--var` al ejecutar el ar
 Seleccionar un método, añadir un ejemplo o avanzar no envía nada. Solo **Send request**
 o Enter en la pantalla de confirmación realiza la llamada.
 
+### Capturar el token durante la prueba interactiva
+
+No necesitas copiar el token ni escribir el YAML manualmente:
+
+1. Configura y envía la request de login.
+2. En su respuesta pulsa **Use response token** (o `c`). Selecciona el campo que
+   contiene el access token, por ejemplo `$["access_token"]`. El selector muestra
+   las rutas, sin revelar sus valores. Después elige los asserts y pulsa **Add request**.
+3. Pulsa **Add another request** y configura la URL protegida.
+4. En Headers pulsa **Use captured token**. Se añade `Authorization: Bearer {{authToken}}`;
+   al confirmar se envía el valor que acabas de obtener, sin que lo copies.
+5. Agrega la request y guarda el flujo con **Save file**.
+
+El archivo guarda la ruta de extracción (`capture.authToken`), no el token. Al
+ejecutarlo, httpi hace login de nuevo y utiliza el token nuevo para las siguientes
+requests. No lo reutiliza entre ejecuciones. Si falla el login, sus asserts o la
+extracción, se detiene el flujo sin enviar las siguientes requests. `{{authToken}}`
+queda reservado a la captura y no usa un valor antiguo del entorno o de `--var`.
+
+Para probarlo localmente, inicia `node examples/server.mjs` y crea una prueba con
+POST `http://127.0.0.1:3000/auth/login`, header `Content-Type: application/json` y
+body `{"username":"demo","password":"demo"}`. Selecciona `access_token`, agrega
+GET `http://127.0.0.1:3000/private/users` y usa el token capturado. Es una API de
+demostración; esas credenciales son ficticias. También se incluye el flujo equivalente:
+
+```bash
+httpi run examples/auth.yaml --env dev --show-response
+```
+
+Los tokens capturados se mantienen en memoria y se ocultan en los reportes pretty
+y JUnit. La respuesta de login se oculta incluso con `--show-response`. Las opciones
+del asistente evitan asserts con el valor literal del token. Para credenciales reales,
+usa variables de entorno en el login y revisa el archivo antes de compartirlo: los
+campos de usuario/password del body no se extraen automáticamente como secretos.
+
+La captura actual está orientada a tokens Bearer en una respuesta JSON. El exportador
+de curl estático rechaza estos flujos, porque no puede reproducir la extracción.
+
 ## Importar un curl
 
 ```bash

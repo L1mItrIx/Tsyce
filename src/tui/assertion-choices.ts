@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { expectSchema, type Expect } from '../core/schema.js';
 import type { RunResult } from '../core/runner/exec.js';
+import { REDACTED } from '../core/capture.js';
 
 const choiceSchema = z.object({ label: z.string(), expect: expectSchema });
 export type AssertionChoice = z.infer<typeof choiceSchema>;
@@ -21,6 +22,7 @@ export function assertionChoices(result: RunResult): AssertionChoice[] {
     if (choices.length >= 30) break;
     if (values[0] === undefined) continue;
     const value = name.toLowerCase() === 'content-type' ? values[0].split(';')[0]! : values[0];
+    if (/authorization|cookie|token/i.test(name) || value.includes(REDACTED)) continue;
     choices.push({ label: `Header ${show(name)} contains ${show(value)}`, expect: { headers: { [name]: { contains: value } } } });
   }
   let body: z.infer<ReturnType<typeof z.json>>;
@@ -31,6 +33,7 @@ export function assertionChoices(result: RunResult): AssertionChoice[] {
     const type = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value as 'string' | 'number' | 'boolean' | 'object';
     choices.push({ label: `${path} type ${type}`, expect: { json: [{ path, type }] } });
     if (value === null || typeof value !== 'object') {
+      if (/token|authorization|password|secret/i.test(path) || (typeof value === 'string' && value.includes(REDACTED))) return;
       choices.push({ label: `${path} equals ${show(value)}`, expect: { json: [{ path, equals: value }] } });
       if (typeof value === 'string') {
         choices.push({ label: `${path} contains ${show(value)}`, expect: { json: [{ path, contains: value }] } });

@@ -69,10 +69,14 @@ export const expectSchema = z.strictObject({
   json: z.array(jsonExpectSchema).optional(),
 });
 
+export const captureSchema = z.strictObject({ authToken: jsonPath });
+export type Capture = z.infer<typeof captureSchema>;
+
 export const testSchema = z.strictObject({
   name: z.string().min(1),
   request: requestSchema,
   expect: expectSchema.default({}),
+  capture: captureSchema.optional(),
 });
 
 export const testFileSchema = z.strictObject({

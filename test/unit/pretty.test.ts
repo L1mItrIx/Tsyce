@@ -83,3 +83,9 @@ test('response formatting preserves large numeric IDs instead of rounding them',
   const response = { ...outcomes[0]!, result: { ...outcomes[0]!.result, body: '{"id":9007199254740993}' } };
   expect(formatPretty(undefined, [response], { color: false, showResponse: true })).toContain('9007199254740993');
 });
+
+test('authentication response fields are identified as hidden rather than reported as empty', () => {
+  const report = formatPretty(undefined, [{ ...outcomes[0]!, responseHidden: true }], { color: false, showResponse: true });
+  expect(report).toContain('Authentication response hidden');
+  expect(report).not.toContain('Headers:');
+});

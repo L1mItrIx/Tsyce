@@ -58,6 +58,8 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 
 - [x] U4 Varias requests desde el asistente, en un solo YAML y en orden; commit `U4: build ordered multi-request files in the wizard`.
 
+- [x] U5 Capturar el token desde el asistente y reutilizarlo en vivo y al repetir el archivo; commit `U5: capture authentication tokens in the interactive flow`.
+
 ## Decisiones
 Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 
@@ -101,6 +103,8 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-11 — U3: clics en métodos, navegación, presets JSON, envío, asserts y guardado; rueda para formularios altos y opciones. Las posiciones se miden al recibir el evento y se ajustan al scroll. El parser admite secuencias fragmentadas e ignora eventos de mouse dentro de pegados delimitados. Se restauran mouse y pantalla al salir. Sin dependencias nuevas. Verificado con 432 tests y recorrido SGR en TTY: POST 201, YAML guardado y ejecutado correctamente; un doble clic de reintento no duplica requests.
 
 - 2026-11-11 — U4: `httpi new` agrega requests al flujo con Add request; el resumen permite Add another request o Save file. Las requests se guardan y ejecutan en el orden de creación. Cancelar una posterior conserva las anteriores en el resumen. Mismo secreto = misma variable; valores distintos reciben variables distintas sin colisionar con referencias existentes. `--name` conserva el nombre de test único y nombra el archivo en colecciones. Verificado con 437 tests y recorrido CLI real de dos requests (ambas pasaron); guardar no vuelve a enviarlas.
+
+- 2026-11-12 — U5 solicitada por el usuario: se autoriza la captura de tokens como excepción al alcance inicial. El asistente permite seleccionar un campo JSON del login y añadir Authorization Bearer en las siguientes requests; guarda solo `capture.authToken` y la referencia, nunca el token capturado. Cada ejecución autentica de nuevo y detiene el flujo si falla el login, sus asserts o la extracción. La variable reservada no cae a tokens antiguos; los reportes ocultan la respuesta de autenticación y redactan tokens capturados. Capturas limitadas a Bearer JSON, sin OAuth ni scripting; exportación curl estática rechazada para estos flujos. Demo local de login/ruta protegida y GIF actualizados. Verificado: 457 tests, CLI real y recorrido con mouse que guarda y repite el flujo con un token nuevo. Publicación npm sigue aplazada.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.

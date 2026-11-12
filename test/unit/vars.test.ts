@@ -3,6 +3,11 @@ import { resolveVars, UnresolvedVariableError, type VarSources } from '../../src
 
 const sources = (partial: Partial<VarSources> = {}): VarSources => ({ cli: {}, system: {}, file: {}, ...partial });
 
+test('runtime authentication values take precedence and an unavailable capture never falls back to a stale token', () => {
+  expect(resolveVars('Bearer {{authToken}}', sources({ cli: { authToken: 'stale' }, runtime: { authToken: 'fresh' } }))).toBe('Bearer fresh');
+  expect(() => resolveVars('{{authToken}}', sources({ system: { authToken: 'stale' }, runtime: { authToken: undefined } }))).toThrow(UnresolvedVariableError);
+});
+
 describe('substitution', () => {
   test.each([
     ['whole string', '{{token}}', 'abc'],

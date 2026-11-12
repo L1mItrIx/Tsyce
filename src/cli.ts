@@ -18,7 +18,7 @@ import { CurlImportError, extractSecrets, mapFlags } from './core/importer/map-f
 import { ShellSyntaxError } from './core/importer/tokenize-bash.js';
 import { formatPretty } from './core/reporter/pretty.js';
 import { formatJUnit } from './core/reporter/junit.js';
-import { EXIT, type ExitCode, exitCodeFor, runTestFile } from './core/run.js';
+import { EXIT, type ExitCode, exitCodeFor, runTestFile, validateRunVariables } from './core/run.js';
 import { detectCurl } from './core/runner/detect.js';
 import { CurlUnavailableError, runRequest } from './core/runner/exec.js';
 import type { TestFile } from './core/schema.js';
@@ -33,15 +33,18 @@ async function runCommand(path: string, options: RunOptions): Promise<ExitCode> 
   if (options.showResponse && options.reporter !== 'pretty') {
     throw new TestFileError('--show-response requires --reporter pretty; omit it when generating JUnit');
   }
-  const file = resolveVars(await readTestFile(path), {
+  const file = await readTestFile(path);
+  const sources = {
     cli: options.var,
     system: process.env,
     file: options.env === undefined ? {} : await readEnvironment(path, options.env),
-  });
+  };
+  validateRunVariables(file, sources);
+  const title = resolveVars(file.name, sources);
   const curl = await detectCurl();
-  const outcomes = await runTestFile(file, curl.bin);
+  const outcomes = await runTestFile(file, curl.bin, sources);
   const color = process.stdout.isTTY === true && !process.env.NO_COLOR;
-  const report = options.reporter === 'junit' ? formatJUnit(file.name, outcomes) : formatPretty(file.name, outcomes, { color, showResponse: options.showResponse === true });
+  const report = options.reporter === 'junit' ? formatJUnit(title, outcomes) : formatPretty(title, outcomes, { color, showResponse: options.showResponse === true });
   process.stdout.write(`${report}\n`);
   return exitCodeFor(outcomes);
 }
@@ -94,7 +97,9 @@ async function newCommand(path: string, options: { name?: string }): Promise<Exi
 }
 
 async function exportCommand(path: string, options: ExportOptions): Promise<ExitCode> {
-  const file = resolveVars(await readTestFile(path), {
+  const input = await readTestFile(path);
+  if (input.tests.some((test) => test.capture)) throw new TestFileError('Authentication capture flows must be executed with httpi run; static curl export cannot reproduce token captures');
+  const file = resolveVars(input, {
     cli: options.var,
     system: process.env,
     file: options.env === undefined ? {} : await readEnvironment(path, options.env),

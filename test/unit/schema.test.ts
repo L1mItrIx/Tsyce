@@ -3,6 +3,13 @@ import { expectSchema, testFileSchema } from '../../src/core/schema.js';
 
 const minimal = { version: 1, tests: [{ name: 't', request: { url: 'http://x' } }] };
 
+test('authentication capture is optional, strict and requires a valid JSONPath', () => {
+  expect(testFileSchema.safeParse({ ...minimal, tests: [{ ...minimal.tests[0], capture: { authToken: '$.access_token' } }] }).success).toBe(true);
+  for (const capture of [{}, { token: '$.token' }, { authToken: '$[' }, { authToken: 123 }]) {
+    expect(testFileSchema.safeParse({ ...minimal, tests: [{ ...minimal.tests[0], capture }] }).success).toBe(false);
+  }
+});
+
 describe('testFileSchema', () => {
   test('accepts the minimal file', () => {
     expect(testFileSchema.safeParse(minimal).success).toBe(true);

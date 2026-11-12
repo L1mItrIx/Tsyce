@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=../schema/httpi.schema.json
+version: 1
+name: Login y consulta protegida
+tests:
+  - name: Autenticación de demostración
+    request:
+      method: POST
+      url: "{{baseUrl}}/auth/login"
+      body:
+        json: { username: demo, password: demo }
+    expect:
+      status: 200
+    capture:
+      authToken: '$["access_token"]'
+  - name: Consultar usuarios con el token nuevo
+    request:
+      method: GET
+      url: "{{baseUrl}}/private/users"
+      headers:
+        Authorization: "Bearer {{authToken}}"
+    expect:
+      status: 200

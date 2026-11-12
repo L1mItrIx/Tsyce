@@ -1,4 +1,4 @@
-/** Where variable values come from, in order of precedence for `{{name}}`: cli, system, file. */
+/** User values come from cli, system, file; reserved runtime captures take precedence. */
 export type VarSources = {
   /** `--var name=value` */
   cli: Record<string, string>;
@@ -6,6 +6,8 @@ export type VarSources = {
   system: Record<string, string | undefined>;
   /** The selected environment of httpi.env.yaml. */
   file: Record<string, string>;
+  /** Captured values reserved by the current flow; undefined prevents stale fallback. */
+  runtime?: Record<string, string | undefined>;
 };
 
 export class UnresolvedVariableError extends Error {
@@ -23,7 +25,7 @@ function substitute(text: string, sources: VarSources, unresolved: Set<string>):
   return text.replace(REFERENCE, (reference, name: string | undefined, systemName: string | undefined) => {
     const value =
       name !== undefined
-        ? (sources.cli[name] ?? sources.system[name] ?? sources.file[name])
+        ? (sources.runtime && Object.hasOwn(sources.runtime, name) ? sources.runtime[name] : sources.cli[name] ?? sources.system[name] ?? sources.file[name])
         : sources.system[systemName as string];
     if (value === undefined) unresolved.add(reference);
     return value ?? reference;

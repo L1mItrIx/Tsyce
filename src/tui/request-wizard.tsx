@@ -4,12 +4,12 @@ import type { RequestSpec } from '../core/schema.js';
 import { createWizardState, HTTP_METHODS, wizardReducer } from './wizard-state.js';
 import { MouseTarget } from './mouse-controls.js';
 
-export type RequestWizardProps = { onComplete: (request: RequestSpec) => void; onCancel: () => void };
+export type RequestWizardProps = { onComplete: (request: RequestSpec) => void; onCancel: () => void; hasCapturedToken?: boolean };
 const labels = { method: 'Method (default GET)', url: 'URL', headers: 'Headers (one Name: value per line)', body: 'Body (literal text; empty for none)' };
 const methodColors = { GET: 'green', POST: 'yellow', PUT: 'blue', PATCH: 'magenta', DELETE: 'red', HEAD: 'cyan', OPTIONS: 'white' } as const;
 const editorSteps = ['method', 'url', 'headers', 'body', 'review'] as const;
 
-export function RequestWizard({ onComplete, onCancel }: RequestWizardProps) {
+export function RequestWizard({ onComplete, onCancel, hasCapturedToken = false }: RequestWizardProps) {
   const [state, dispatch] = useReducer(wizardReducer, undefined, createWizardState);
   const notified = useRef(false);
   useEffect(() => {
@@ -80,6 +80,9 @@ export function RequestWizard({ onComplete, onCancel }: RequestWizardProps) {
         <MouseTarget onClick={addJsonHeader} disabled={/^\s*content-type\s*:/im.test(state.input)}>
           <Text color="cyan">[ Add JSON header ]</Text>
         </MouseTarget>
+        {hasCapturedToken && <MouseTarget onClick={() => dispatch({ type: 'use-captured-token' })}>
+          <Text color="green">[ Use captured token ]</Text>
+        </MouseTarget>}
       </Box>}
       {state.step === 'body' && <Box flexDirection="column" marginBottom={1}>
         <Text>The body is data sent to the API, for example {`{"name":"Ana"}`}.</Text>
