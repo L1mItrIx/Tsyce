@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { text } from 'node:stream/consumers';
 import { existsSync } from 'node:fs';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, relative, resolve } from 'node:path';
 import { Command, InvalidArgumentError, Option } from 'commander';
 import { CurlExportError, exportCurl } from './core/exporter/curl.js';
@@ -76,6 +77,16 @@ async function runProjectCommand(projectPath: string, options: RunOptions): Prom
   }));
   const report = options.reporter === 'junit' ? formatJUnitSuites(suites) : formatPrettyProject(suites, prettyOptions(options));
   process.stdout.write(`${report}\n`);
+  if (project.report?.junit !== undefined) {
+    // A report is an output of the run: it replaces the one from the previous run.
+    const junitPath = resolve(dirname(projectPath), project.report.junit);
+    try {
+      await mkdir(dirname(junitPath), { recursive: true });
+      await writeFile(junitPath, `${formatJUnitSuites(suites)}\n`);
+    } catch (cause) {
+      throw new TestFileError(`${junitPath}: cannot write the JUnit report: ${(cause as Error).message}`, { cause });
+    }
+  }
   return exitCodeFor(perFile.flat());
 }
 

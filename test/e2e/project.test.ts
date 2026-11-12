@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -139,6 +139,21 @@ test('--reporter junit writes one testsuite per file', async () => {
     '<testsuite name="tests/users.yaml"',
   ]);
   expect(result.code).toBe(0);
+});
+
+test('report.junit writes the XML next to the normal report, replacing the previous one, also when tests fail', async () => {
+  await project({ report: { junit: 'reports/ci/junit.xml' } });
+  const first = await httpi(['run'], { cwd: join(root, 'tests') });
+  expect(first.stdout).toContain('4 files, 5 tests: 5 passed');
+  const xml = await readFile(join(root, 'reports', 'ci', 'junit.xml'), 'utf8');
+  expect(xml).toContain('<testsuites tests="5" failures="0" errors="0"');
+  expect(xml).not.toContain('PROJECT_TOKEN_');
+  expect(xml.endsWith('</testsuites>\n')).toBe(true);
+
+  await write('tests/admin/a.yaml', { version: 1, tests: [guarded('admin a', '/admin/a', 204)] });
+  const second = await httpi(['run'], { cwd: root });
+  expect(second.code).toBe(1);
+  expect(await readFile(join(root, 'reports', 'ci', 'junit.xml'), 'utf8')).toContain('<testsuites tests="5" failures="1" errors="0"');
 });
 
 test('--env picks another environment of httpi.yaml and --var wins over it', async () => {

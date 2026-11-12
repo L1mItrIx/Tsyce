@@ -38,6 +38,7 @@ describe('projectFileSchema', () => {
     ['run entry without file', { version: 1, run: [{}] }],
     ['run entry with an unknown key', { version: 1, run: [{ file: 'a.yaml', retries: 2 }] }],
     ['env without environments', { version: 1, run: ['a.yaml'], env: { default: 'dev' } }],
+    ['report with an unknown format', { version: 1, run: ['a.yaml'], report: { html: 'r.html' } }],
   ])('rejects %s', (_name, input) => {
     expect(projectFileSchema.safeParse(input).success).toBe(false);
   });

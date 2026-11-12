@@ -118,6 +118,12 @@ export const projectFileSchema = z.strictObject({
     })
     .optional(),
   run: z.array(runEntrySchema).min(1),
+  report: z
+    .strictObject({
+      /** JUnit XML written after every project run, relative to httpi.yaml. */
+      junit: projectPath.optional(),
+    })
+    .optional(),
 });
 
 export type RunEntry = z.infer<typeof runEntrySchema>;

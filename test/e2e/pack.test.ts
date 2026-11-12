@@ -14,6 +14,7 @@ test('npm distribution contains the complete runtime, schema and examples withou
   expect(files).toContain('dist/tui/new-wizard.js');
   expect(files).toContain('dist/core/reporter/junit.js');
   expect(files).toContain('schema/httpi.schema.json');
+  expect(files).toContain('schema/httpi.project.schema.json');
   expect(files).toContain('examples/users.yaml');
   expect(files).toContain('README.md');
   expect(files.some((path) => /^(src|test|node_modules|\.claude|\.git)\//.test(path))).toBe(false);

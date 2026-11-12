@@ -70,7 +70,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 ### V1 — Proyecto
 - [x] V1.1 `projectFileSchema` y `project.ts`: localizar y leer `httpi.yaml`, expandir `run:` (rutas y patrones)
 - [x] V1.2 `httpi run` sin argumentos: ejecuta el proyecto, entornos en `httpi.yaml` (`env.default`), estado compartido entre archivos
-- [ ] V1.3 `report.junit` y `schema/httpi.project.schema.json` publicado
+- [x] V1.3 `report.junit` y `schema/httpi.project.schema.json` publicado
 
 ### V2 — Capturas generales
 - [ ] V2.1 `capture` como mapa `{ nombre: jsonpath }` (`authToken` conserva su comportamiento)
@@ -161,6 +161,7 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-12 — v0.2: el usuario aprueba ejecutar el plan preparado en el chat de planificación ("httpi: plan de arquitectura y research"); queda como `PLAN.md` §15. OAuth, importación OpenAPI/Postman, capturas generales y mouse dejan de estar fuera de alcance. Sin dependencias nuevas (CSV y OAuth con módulos de Node). No se abre pull request a `main` hasta que el usuario lo pida.
 - 2026-11-12 — V1.1: `httpi.yaml` se busca en el directorio actual y hacia arriba (gana el más cercano). Las rutas de `run:` son relativas a `httpi.yaml`; una ruta inexistente o un patrón sin coincidencias es error (salida 2), no una corrida vacía; un archivo listado dos veces corre dos veces. Patrones con `fs.glob` de Node.
 - 2026-11-12 — V1.2: `httpi run` sin argumento (o con la ruta de un `httpi.yaml`) ejecuta el proyecto como un solo flujo: el token capturado en un archivo vale para los siguientes y un login fallido detiene todo el proyecto (los archivos no alcanzados salen como "not run"). Todas las variables se validan antes de enviar nada. Entorno: `--env` o `env.default`; si `httpi.yaml` declara `env`, `httpi.env.yaml` se ignora con aviso; si no, se sigue leyendo. `httpi run <archivo>` no cambia y no consulta `httpi.yaml` (no se hizo la delegación de `readEnvironment` que mencionaba el plan, para no alterar el comportamiento actual). Título de cada archivo en el reporte: su `name` o su ruta relativa; el `name` del proyecto aún no se muestra.
+- 2026-11-12 — V1.3: `report.junit` se escribe en cada corrida del proyecto (ruta relativa a `httpi.yaml`, crea la carpeta y reemplaza el reporte anterior), además del reporte elegido por stdout y también cuando hay fallos. No se escribe si la corrida se aborta antes de enviar (salida 2).
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.
