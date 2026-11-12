@@ -29,6 +29,7 @@ test('confirmed request runs real curl, then selection produces passing assertio
     await vi.waitFor(() => expect(app.lastFrame()).toContain('Choose assertions'));
     expect(calls).toBe(1);
     await key('\r');
+    await vi.waitFor(() => expect(done).toHaveBeenCalledOnce());
     const [request, expected] = done.mock.calls[0]!;
     expect(expected.status).toBe(201);
     const response = await runRequest(curl.bin, request);
@@ -50,6 +51,6 @@ test('network failure offers retry/edit rather than saving assertions; Ctrl+C ab
   await vi.waitFor(() => expect(app.lastFrame()).toContain('connection refused'));
   expect(complete).not.toHaveBeenCalled();
   await key('\u0003');
-  expect(cancel).toHaveBeenCalledOnce();
+  await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
   expect(signal?.aborted).toBe(true);
 });

@@ -46,7 +46,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 
 ## Fase 7 — CI y publicación
 - [x] F7.1 Reporter JUnit; commit `F7.1: add JUnit XML output for CI`
-- [ ] F7.2 README con ejemplo de GitHub Actions
+- [~] F7.2 README con ejemplo de GitHub Actions; rama `claude/bold-albattani-fsyz04`
 - [ ] F7.3 Publicar `httpi.schema.json`
 - [ ] F7.4 Decidir nombre en npm (pendiente del usuario) y `npm publish`
 
@@ -81,6 +81,8 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-11 — El usuario autoriza completar F5 sin el prototipo y continuar el proyecto; nombre elegido para npm: `httpi-cli`. Se conserva la rama indicada.
 
 - 2026-11-11 — F5 completa sin prototipo: formulario con Enter/Tab y Esc; confirmación explícita antes de enviar, asserts seleccionables desde respuesta real y guardado YAML sin sobrescribir. `httpi new [archivo] --name ...` requiere TTY; Authorization/Cookie se extraen a variables igual que al importar. Ctrl+C aborta curl. Verificación local: 406 tests y recorrido manual en TTY que guardó y ejecutó un test con éxito.
+
+- 2026-11-11 — CI F5.4: las pruebas de Ink leían callbacks tras una espera fija; se cambia a esperar la condición `toHaveBeenCalledOnce` sin subir timeouts, saltar tests ni relajar asserts. Verificación local: 411 tests; pendiente revalidación remota.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.
