@@ -13,10 +13,10 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 - [x] F1.1 `runner/detect.ts`: binario de curl y versión mínima 7.83.0
 - [x] F1.2 `runner/curl-args.ts`: request → `string[]`
 - [x] F1.3 `runner/exec.ts`: spawn, `-w`, `-o`, temporales, errores
-- [~] F1.4 Tests de integración con servidor `node:http`: 200 JSON, 404, puerto cerrado, timeout, redirect — rama `claude/bold-albattani-fsyz04`
+- [x] F1.4 Tests de integración con servidor `node:http`: 200 JSON, 404, puerto cerrado, timeout, redirect
 
 ## Fase 2 — Formato y `run`
-- [ ] F2.1 `schema.ts` (zod) y `file.ts` (YAML/JSON)
+- [x] F2.1 `schema.ts` (zod) y `file.ts` (YAML/JSON)
 - [ ] F2.2 `asserts.ts`: status, maxTimeMs, headers, json (json-p3)
 - [ ] F2.3 `reporter/pretty` y códigos de salida 0/1/2/3
 - [ ] F2.4 `httpi run <archivo>` + tests e2e de códigos de salida
@@ -60,6 +60,7 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-12 — F1.1: el helper `spawnCollect` y `CurlUnavailableError` viven en `runner/exec.ts` (único lugar que hace `spawn`); `detect.ts` los importa.
 - 2026-11-12 — F1.2: el esquema de `request` nace ya en `schema.ts` (el tipo sale de zod); opciones planas en `request` (`followRedirects`, `insecure`, `compressed`, `timeoutMs`); body `{ json }` o `{ text }`. `curl-args` siempre añade `--globoff` y `--url` (URL literal), y solo pasa `--request` cuando el método no es el que curl ya infiere.
 - 2026-11-12 — F1.3: `runRequest` pasa `-q` (ignora `~/.curlrc`) para que la prueba sea reproducible; un fallo de curl no lanza excepción: devuelve `status: 0`, `curlExitCode` y `error`. El body se devuelve como texto UTF-8.
+- 2026-11-12 — F2.1: objetos estrictos (clave desconocida = error, no se ignora); `expect` es opcional (sin asserts el test solo exige que curl obtenga respuesta); cada assert JSON lleva `path` y exactamente un comparador; `contains` acepta cualquier valor JSON.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.

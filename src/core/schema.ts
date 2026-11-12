@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const bodySchema = z.union([
   z.strictObject({ json: z.json() }),
   z.strictObject({ text: z.string() }),
-]);
+], { error: 'body must be exactly one of { json } or { text }' });
 
 export const requestSchema = z.strictObject({
   method: z
@@ -20,3 +20,60 @@ export const requestSchema = z.strictObject({
 });
 
 export type RequestSpec = z.infer<typeof requestSchema>;
+
+const statusCode = z.number().int().min(100).max(599);
+
+export const headerExpectSchema = z.union([
+  z.strictObject({ equals: z.string() }),
+  z.strictObject({ contains: z.string() }),
+], { error: 'header assert must be exactly one of { equals } or { contains }' });
+
+const regexSource = z.string().refine(
+  (source) => {
+    try {
+      new RegExp(source);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  { error: 'matches must be a valid regular expression' },
+);
+
+const jsonPath = z.string().startsWith('$', 'path must be a JSONPath starting with $');
+
+export const jsonExpectSchema = z.union([
+  z.strictObject({ path: jsonPath, equals: z.json() }),
+  z.strictObject({ path: jsonPath, exists: z.boolean() }),
+  z.strictObject({ path: jsonPath, contains: z.json() }),
+  z.strictObject({ path: jsonPath, matches: regexSource }),
+  z.strictObject({
+    path: jsonPath,
+    type: z.enum(['string', 'number', 'boolean', 'object', 'array', 'null']),
+  }),
+], { error: 'json assert must be { path, <exactly one of equals | exists | contains | matches | type> }' });
+
+export const expectSchema = z.strictObject({
+  status: z.union([statusCode, z.array(statusCode).min(1)]).optional(),
+  maxTimeMs: z.number().positive().optional(),
+  headers: z.record(z.string(), headerExpectSchema).optional(),
+  json: z.array(jsonExpectSchema).optional(),
+});
+
+export const testSchema = z.strictObject({
+  name: z.string().min(1),
+  request: requestSchema,
+  expect: expectSchema.default({}),
+});
+
+export const testFileSchema = z.strictObject({
+  version: z.literal(1),
+  name: z.string().optional(),
+  tests: z.array(testSchema).min(1),
+});
+
+export type HeaderExpect = z.infer<typeof headerExpectSchema>;
+export type JsonExpect = z.infer<typeof jsonExpectSchema>;
+export type Expect = z.infer<typeof expectSchema>;
+export type TestCase = z.infer<typeof testSchema>;
+export type TestFile = z.infer<typeof testFileSchema>;
