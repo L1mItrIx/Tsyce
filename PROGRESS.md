@@ -50,6 +50,10 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 - [x] F7.3 Publicar `httpi.schema.json`; commit `F7.3: generate and publish JSON Schema from zod`
 - [~] F7.4 `httpi-cli@0.1.0` preparado y tarball instalado/verificado; publicación aplazada por el usuario. Commit `F7.4: prepare httpi-cli 0.1.0 for npm distribution`
 
+## Mejoras solicitadas por el usuario
+- [x] U1 Selector visual de métodos HTTP y marco de terminal; commit `U1: add visual HTTP method selection to the request wizard`.
+- [ ] U2 Ejecución de archivos con respuestas visibles y ejemplo GET/POST por ambiente.
+
 ## Decisiones
 Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 

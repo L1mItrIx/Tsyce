@@ -49,7 +49,8 @@ La versión preparada es **0.1.0**. No hay publicación automática configurada.
 httpi new usuarios.yaml --name "Consultar usuarios"
 ```
 
-1. Escribe el método y la URL; pulsa Enter para continuar. Método vacío = GET.
+1. Selecciona GET, POST, PUT, PATCH, DELETE, HEAD u OPTIONS con las flechas y pulsa Enter.
+   También puedes escribir un método personalizado. Luego escribe la URL y pulsa Enter.
 2. Añade headers, uno por línea. En headers y body, Enter añade una línea y Tab avanza.
 3. Revisa y confirma. Solo entonces se envía la request **una vez**, incluso si es POST o DELETE.
 4. Selecciona asserts con ↑/↓ y espacio. El status recibido está seleccionado inicialmente.

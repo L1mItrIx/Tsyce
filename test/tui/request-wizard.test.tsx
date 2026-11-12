@@ -1,8 +1,12 @@
 import { afterEach, expect, test, vi } from 'vitest';
+import { act } from 'react';
 import { cleanup, render } from 'ink-testing-library';
 import { RequestWizard } from '../../src/tui/request-wizard.js';
 
-afterEach(cleanup);
+afterEach(async () => {
+  await act(async () => { cleanup(); });
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: false });
+});
 const tick = () => new Promise((resolve) => setTimeout(resolve, 50));
 
 test('keyboard edits the request and requires confirmation before handing it off', async () => {
@@ -37,4 +41,25 @@ test('Escape goes back and Ctrl+C cancels without handing off a request', async 
   app.stdin.write('\u0003'); await tick();
   expect(cancel).toHaveBeenCalledOnce();
   expect(complete).not.toHaveBeenCalled();
+});
+
+test('visible method buttons respond to arrows and Enter; the prompt and footer stay separate', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  let app!: ReturnType<typeof render>;
+  await act(async () => { app = render(<RequestWizard onComplete={vi.fn()} onCancel={vi.fn()} />); });
+  const key = async (value: string) => {
+    await act(async () => {});
+    await act(async () => { app.stdin.write(value); });
+  };
+  await act(async () => {});
+  expect(app.lastFrame()).toContain('> GET');
+  for (const method of ['POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']) expect(app.lastFrame()).toContain(method);
+  await key('\u001b[C');
+  expect(app.lastFrame()).toContain('> POST');
+  await key('\r');
+  expect(app.lastFrame()).toContain('URL');
+  expect(app.lastFrame()).toContain('[POST]');
+  await key('\u001b');
+  await vi.waitFor(() => expect(app.lastFrame()).toContain('> POST'));
+  expect(app.lastFrame()).toContain('Ctrl+C: cancel');
 });

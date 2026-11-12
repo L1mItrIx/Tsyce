@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { createWizardState, wizardReducer } from '../../src/tui/wizard-state.js';
+import { createWizardState, HTTP_METHODS, wizardReducer } from '../../src/tui/wizard-state.js';
 
 const submit = (state: ReturnType<typeof createWizardState>, value: string) =>
   wizardReducer(wizardReducer(state, { type: 'input', value }), { type: 'next' });
@@ -59,4 +59,21 @@ test('cancel is terminal and next at the first step cannot go back', () => {
   const cancelled = wizardReducer(initial, { type: 'cancel' });
   expect(cancelled.step).toBe('cancelled');
   expect(submit(cancelled, 'POST')).toBe(cancelled);
+});
+
+test('method selection wraps through the visible methods and commits the chosen method', () => {
+  const initial = createWizardState();
+  const post = wizardReducer(initial, { type: 'move-method', direction: 1 });
+  expect(post.input).toBe('POST');
+  expect(wizardReducer(post, { type: 'next' }).request.method).toBe('POST');
+  const previous = wizardReducer(initial, { type: 'move-method', direction: -1 });
+  expect(previous.input).toBe(HTTP_METHODS.at(-1));
+  expect(wizardReducer(previous, { type: 'move-method', direction: 1 }).input).toBe('GET');
+  expect(wizardReducer(initial, { type: 'next' }).request.method).toBe('GET');
+});
+
+test('custom methods remain editable and method arrows cannot change later stages', () => {
+  const state = submit(createWizardState(), 'PROPFIND');
+  expect(state.request.method).toBe('PROPFIND');
+  expect(wizardReducer(state, { type: 'move-method', direction: 1 })).toBe(state);
 });

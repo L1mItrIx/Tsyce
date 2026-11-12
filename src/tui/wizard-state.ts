@@ -2,12 +2,14 @@ import { z } from 'zod';
 import { requestSchema, type RequestSpec } from '../core/schema.js';
 
 const steps = ['method', 'url', 'headers', 'body', 'review', 'ready', 'cancelled'] as const;
+export const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const;
 const wizardStateSchema = z.object({
   step: z.enum(steps), input: z.string(), error: z.string().nullable(),
   request: requestSchema.extend({ url: z.string() }),
 });
 export type WizardState = z.infer<typeof wizardStateSchema>;
-export type WizardAction = { type: 'input'; value: string } | { type: 'next' | 'back' | 'cancel' };
+export type WizardAction = { type: 'input'; value: string } | { type: 'next' | 'back' | 'cancel' }
+  | { type: 'move-method'; direction: -1 | 1 };
 
 export function createWizardState(): WizardState {
   return { step: 'method', input: '', error: null, request: { method: 'GET', url: '', headers: {} } };
@@ -47,6 +49,13 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
   if (state.step === 'ready' || state.step === 'cancelled') return state;
   if (action.type === 'cancel') return { ...state, step: 'cancelled', error: null };
   if (action.type === 'input') return { ...state, input: action.value, error: null };
+  if (action.type === 'move-method') {
+    if (state.step !== 'method') return state;
+    const method = state.input.trim().toUpperCase() || state.request.method;
+    const current = HTTP_METHODS.findIndex((item) => item === method);
+    const index = current < 0 ? 0 : (current + action.direction + HTTP_METHODS.length) % HTTP_METHODS.length;
+    return { ...state, input: HTTP_METHODS[index]!, error: null };
+  }
   const index = steps.indexOf(state.step);
   if (action.type === 'back') {
     if (index === 0) return state;
