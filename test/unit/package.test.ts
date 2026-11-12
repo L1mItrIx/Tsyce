@@ -12,7 +12,7 @@ test('package is ESM, targets Node >= 22 and exposes the httpi bin', () => {
   expect(pkg.files).toEqual(['dist']);
 });
 
-test('check runs typecheck, tests and build', () => {
+test('check runs typecheck, build and tests (e2e tests need dist/)', () => {
   const scripts = pkg.scripts as Record<string, string>;
-  expect(scripts.check).toBe('npm run typecheck && npm run test && npm run build');
+  expect(scripts.check).toBe('npm run typecheck && npm run build && npm run test');
 });

@@ -1,5 +1,6 @@
-import type { AssertResult } from './asserts.js';
-import type { RunResult } from './runner/exec.js';
+import { type AssertResult, checkExpectations } from './asserts.js';
+import { type RunResult, runRequest } from './runner/exec.js';
+import type { TestFile } from './schema.js';
 
 export const EXIT = {
   /** Every test passed. */
@@ -33,4 +34,15 @@ export function exitCodeFor(outcomes: TestOutcome[]): ExitCode {
   if (statuses.includes('errored')) return EXIT.curl;
   if (statuses.includes('failed')) return EXIT.assertFailed;
   return EXIT.ok;
+}
+
+/** Runs the tests of a file one after another, in file order. */
+export async function runTestFile(file: TestFile, curlBin: string): Promise<TestOutcome[]> {
+  const outcomes: TestOutcome[] = [];
+  for (const test of file.tests) {
+    const result = await runRequest(curlBin, test.request);
+    const asserts = result.error === null ? checkExpectations(test.expect, result) : [];
+    outcomes.push({ name: test.name, result, asserts });
+  }
+  return outcomes;
 }

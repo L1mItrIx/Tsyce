@@ -19,7 +19,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 - [x] F2.1 `schema.ts` (zod) y `file.ts` (YAML/JSON)
 - [x] F2.2 `asserts.ts`: status, maxTimeMs, headers, json (json-p3)
 - [x] F2.3 `reporter/pretty` y códigos de salida 0/1/2/3
-- [ ] F2.4 `httpi run <archivo>` + tests e2e de códigos de salida
+- [x] F2.4 `httpi run <archivo>` + tests e2e de códigos de salida
 
 ## Fase 3 — Variables y entornos
 - [ ] F3.1 `vars.ts`: `{{var}}`, `${ENV}`, precedencia
@@ -63,12 +63,15 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-12 — F2.1: objetos estrictos (clave desconocida = error, no se ignora); `expect` es opcional (sin asserts el test solo exige que curl obtenga respuesta); cada assert JSON lleva `path` y exactamente un comparador; `contains` acepta cualquier valor JSON.
 - 2026-11-12 — F2.2: si un `path` coincide con varios nodos, el comparador debe cumplirse en todos (y debe haber al menos uno); `equals` no convierte tipos; en headers basta con que un valor del header coincida; un `path` que no compila como JSONPath es error de archivo (salida 2), no assert fallido.
 - 2026-11-12 — F2.3: archivo nuevo `src/core/run.ts` (no está en el mapa de PLAN §9): tipo `TestOutcome`, códigos de salida y, desde F2.4, el bucle que ejecuta un archivo. Si hay a la vez error de red y assert fallido, gana la salida 3. El reporter muestra todos los asserts, no solo los fallidos.
+- 2026-11-12 — F2.4: `check` ahora es typecheck → build → tests, porque los e2e ejecutan `dist/cli.js`. Los errores de uso de commander salen con 2 (no 1). `httpi run` recibe un solo archivo; el reporte va a stdout y los errores a stderr; color solo en TTY y sin `NO_COLOR`.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.
 
 - Headers repetidos (mismo nombre varias veces): `headers` es un mapa y no los representa.
 - Cuerpos de respuesta binarios: `RunResult.body` es texto UTF-8.
+- `httpi run` con varios archivos o un directorio.
+- `httpi --version`.
 
 ## Bloqueos
 Qué impide avanzar y qué se necesita del usuario.

@@ -17,7 +17,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json",
-    "check": "npm run typecheck && npm run test && npm run build"
+    "check": "npm run typecheck && npm run build && npm run test"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
@@ -27,6 +27,7 @@
     "vitest": "^5.1.0"
   },
   "dependencies": {
+    "commander": "^15.1.0",
     "ink": "^8.0.0",
     "json-p3": "^3.0.3",
     "react": "^19.3.1",
