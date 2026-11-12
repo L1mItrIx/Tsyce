@@ -12,7 +12,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 ## Fase 1 — Runner
 - [x] F1.1 `runner/detect.ts`: binario de curl y versión mínima 7.83.0
 - [x] F1.2 `runner/curl-args.ts`: request → `string[]`
-- [ ] F1.3 `runner/exec.ts`: spawn, `-w`, `-o`, temporales, errores
+- [x] F1.3 `runner/exec.ts`: spawn, `-w`, `-o`, temporales, errores
 - [ ] F1.4 Tests de integración con servidor `node:http`: 200 JSON, 404, puerto cerrado, timeout, redirect
 
 ## Fase 2 — Formato y `run`
@@ -59,11 +59,13 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-12 — F0.3: `ink-testing-library` 4.0.0 funciona con Ink 8.0.0 + React 19.3 (`render`, `lastFrame()`, `stdin.write()`); el riesgo de PLAN §11 queda descartado, no hace falta el plan B.
 - 2026-11-12 — F1.1: el helper `spawnCollect` y `CurlUnavailableError` viven en `runner/exec.ts` (único lugar que hace `spawn`); `detect.ts` los importa.
 - 2026-11-12 — F1.2: el esquema de `request` nace ya en `schema.ts` (el tipo sale de zod); opciones planas en `request` (`followRedirects`, `insecure`, `compressed`, `timeoutMs`); body `{ json }` o `{ text }`. `curl-args` siempre añade `--globoff` y `--url` (URL literal), y solo pasa `--request` cuando el método no es el que curl ya infiere.
+- 2026-11-12 — F1.3: `runRequest` pasa `-q` (ignora `~/.curlrc`) para que la prueba sea reproducible; un fallo de curl no lanza excepción: devuelve `status: 0`, `curlExitCode` y `error`. El body se devuelve como texto UTF-8.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.
 
 - Headers repetidos (mismo nombre varias veces): `headers` es un mapa y no los representa.
+- Cuerpos de respuesta binarios: `RunResult.body` es texto UTF-8.
 
 ## Bloqueos
 Qué impide avanzar y qué se necesita del usuario.
