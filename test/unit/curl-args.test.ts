@@ -31,6 +31,11 @@ const cases: Array<[name: string, input: Record<string, unknown>, expected: stri
     ['--data-raw', '@not-a-file&a=1'],
   ],
   [
+    'form body becomes one --form per field and implies POST',
+    { method: 'POST', body: { form: ['name=Ana', 'avatar=@a.png'] } },
+    ['--form', 'name=Ana', '--form', 'avatar=@a.png'],
+  ],
+  [
     'PUT with body keeps --request',
     { method: 'PUT', body: { text: 'x' } },
     ['--request', 'PUT', '--data-raw', 'x'],

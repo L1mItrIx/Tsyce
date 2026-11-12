@@ -1,9 +1,5 @@
 import type { RequestSpec } from '../schema.js';
 
-function bodyText(body: NonNullable<RequestSpec['body']>): string {
-  return 'json' in body ? JSON.stringify(body.json) : body.text;
-}
-
 function hasHeader(headers: RequestSpec['headers'], name: string): boolean {
   return Object.keys(headers).some((key) => key.toLowerCase() === name);
 }
@@ -27,7 +23,8 @@ export function buildCurlArgs(request: RequestSpec): string[] {
     if ('json' in body && !hasHeader(headers, 'content-type')) {
       args.push('--header', 'Content-Type: application/json');
     }
-    args.push('--data-raw', bodyText(body));
+    if ('form' in body) for (const field of body.form) args.push('--form', field);
+    else args.push('--data-raw', 'json' in body ? JSON.stringify(body.json) : body.text);
   }
 
   if (request.followRedirects) args.push('--location');

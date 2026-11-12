@@ -4,7 +4,9 @@ import { z } from 'zod';
 export const bodySchema = z.union([
   z.strictObject({ json: z.json() }),
   z.strictObject({ text: z.string() }),
-], { error: 'body must be exactly one of { json } or { text }' });
+  // Multipart fields as curl --form expressions: "name=value", "file=@path".
+  z.strictObject({ form: z.array(z.string().min(1)).min(1) }),
+], { error: 'body must be exactly one of { json }, { text } or { form }' });
 
 export const requestSchema = z.strictObject({
   method: z
