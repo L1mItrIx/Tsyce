@@ -44,7 +44,8 @@ export function prepareWizardFile(tests: TestCase[], name?: string): { file: Tes
   return { file: { version: 1, ...(name !== undefined && tests.length > 1 ? { name } : {}), tests: prepared }, secrets };
 }
 
-function parseWith<T>(schema: z.ZodType<T>, text: string, source: string, kind: string): T {
+/** Parses YAML (JSON is valid YAML) against a schema; `kind` names the document in errors. */
+export function parseWith<T>(schema: z.ZodType<T>, text: string, source: string, kind: string): T {
   let data: unknown;
   try {
     data = parse(text);

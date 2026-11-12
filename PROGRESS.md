@@ -68,7 +68,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 - [ ] V0.2 Integrar `claude/bold-albattani-fsyz04` a `main` (pull request; pendiente de que el usuario lo pida)
 
 ### V1 — Proyecto
-- [ ] V1.1 `projectFileSchema` y `project.ts`: localizar y leer `httpi.yaml`, expandir `run:` (rutas y patrones)
+- [x] V1.1 `projectFileSchema` y `project.ts`: localizar y leer `httpi.yaml`, expandir `run:` (rutas y patrones)
 - [ ] V1.2 `httpi run` sin argumentos: ejecuta el proyecto, entornos en `httpi.yaml` (`env.default`), estado compartido entre archivos
 - [ ] V1.3 `report.junit` y `schema/httpi.project.schema.json` publicado
 
@@ -159,6 +159,7 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-12 — U6 solicitada por el usuario: servidor MCP local por stdio, sin dependencias nuevas; herramientas list_tests, inspect_test, create_test y run_test sobre el motor existente. Protocolo con inicialización 2025-11-25 y negociación de tres versiones anteriores; no HTTP/OAuth/tareas MCP. Root obligatorio con comprobación de rutas reales; permisos de escritura/ejecución, orígenes y ambientes fijados al arrancar, sin escalado por el agente. MCP rechaza redirects, multipart y authToken en URLs; timeout por request máximo 30 s. Resultados estructurados omiten bodies, headers, valores esperados y diagnósticos con datos; inspección devuelve metadatos y requiere no poner secretos en sus nombres/rutas. No es un sandbox de SO ni configura automáticamente clientes. Se corrige la redacción del runner que alteraba claves estructurales con tokens cortos. Verificado con 468 tests y cliente oficial @modelcontextprotocol/sdk instalado solo temporalmente fuera del proyecto: descubrimiento, creación y dos ejecuciones con autenticación nueva. README incluye configuración Windows y comparación documental de 25 alternativas con fuentes oficiales, sin atribuir exclusividad MCP ni inventar benchmarks. Publicación npm sigue aplazada.
 
 - 2026-11-12 — v0.2: el usuario aprueba ejecutar el plan preparado en el chat de planificación ("httpi: plan de arquitectura y research"); queda como `PLAN.md` §15. OAuth, importación OpenAPI/Postman, capturas generales y mouse dejan de estar fuera de alcance. Sin dependencias nuevas (CSV y OAuth con módulos de Node). No se abre pull request a `main` hasta que el usuario lo pida.
+- 2026-11-12 — V1.1: `httpi.yaml` se busca en el directorio actual y hacia arriba (gana el más cercano). Las rutas de `run:` son relativas a `httpi.yaml`; una ruta inexistente o un patrón sin coincidencias es error (salida 2), no una corrida vacía; un archivo listado dos veces corre dos veces. Patrones con `fs.glob` de Node.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.

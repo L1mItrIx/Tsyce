@@ -98,3 +98,27 @@ export const envFileSchema = z.record(
 );
 
 export type EnvFile = z.infer<typeof envFileSchema>;
+
+const projectPath = z.string().min(1);
+
+/** One entry of `run:` — a test file, or a pattern such as `tests/admin/*.yaml`. */
+export const runEntrySchema = z.union([projectPath, z.strictObject({ file: projectPath })], {
+  error: 'run entry must be a path, a pattern or { file }',
+});
+
+/** httpi.yaml: the whole project in one file, so that CI only needs `httpi run`. */
+export const projectFileSchema = z.strictObject({
+  version: z.literal(1),
+  name: z.string().optional(),
+  env: z
+    .strictObject({
+      /** Environment used when --env is not given. */
+      default: z.string().min(1).optional(),
+      environments: envFileSchema,
+    })
+    .optional(),
+  run: z.array(runEntrySchema).min(1),
+});
+
+export type RunEntry = z.infer<typeof runEntrySchema>;
+export type ProjectFile = z.infer<typeof projectFileSchema>;
