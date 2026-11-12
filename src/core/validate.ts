@@ -1,11 +1,12 @@
 import { existsSync } from 'node:fs';
 import { dirname, relative, resolve, sep } from 'node:path';
+import { authNamesUsed, checkAuthReferences } from './auth/oauth.js';
 import { type DataRow, readDataFile, readTestRows } from './data.js';
 import { formFilePaths, readTestFile } from './file.js';
 import { extractSecrets } from './importer/map-flags.js';
 import { expandRun, projectEnvironment, readLocalValues, readProjectFile } from './project.js';
 import { type RunItem, validateRunVariables } from './run.js';
-import { UnresolvedVariableError, type VarSources } from './vars.js';
+import { resolveVars, UnresolvedVariableError, type VarSources } from './vars.js';
 
 export type Problem = { file: string; message: string };
 
@@ -64,6 +65,7 @@ export async function validateProject(projectPath: string, options: ValidateOpti
       }
     }
 
+    for (const problem of checkAuthReferences(file, project.auth)) report(target.file, problem);
     const testRows = await attempt(target.file, () => readTestRows(file, target.file));
     let rows: Array<DataRow | undefined> = [undefined];
     if (target.data !== undefined) {
@@ -81,6 +83,19 @@ export async function validateProject(projectPath: string, options: ValidateOpti
       // ${NAME} comes from the system (CI secrets); validation cannot know the machine it will run on.
       const missing = error.references.filter((reference) => !reference.startsWith('${'));
       if (missing.length > 0) report(projectPath, new UnresolvedVariableError(missing).message);
+    }
+    // The auth blocks the tests use must resolve too (again, ${NAME} is left to the machine that runs them).
+    const sources = { cli: options.cli, system: options.system, local, file: environment.variables };
+    for (const name of authNamesUsed(items.map((item) => item.file))) {
+      const config = project.auth?.[name];
+      if (config === undefined) continue;
+      try {
+        resolveVars(config, sources);
+      } catch (error) {
+        if (!(error instanceof UnresolvedVariableError)) throw error;
+        const missing = error.references.filter((reference) => !reference.startsWith('${'));
+        if (missing.length > 0) report(projectPath, `auth "${name}": ${new UnresolvedVariableError(missing).message}`);
+      }
     }
   }
   return { problems, files: targets.length, tests };

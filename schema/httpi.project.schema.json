@@ -41,6 +41,64 @@
       ],
       "additionalProperties": false
     },
+    "auth": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[A-Za-z_][\\w-]*$"
+      },
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "oauth2"
+              },
+              "tokenUrl": {
+                "type": "string",
+                "minLength": 1
+              },
+              "clientId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "scopes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "clientAuth": {
+                "type": "string",
+                "enum": [
+                  "basic",
+                  "body"
+                ]
+              },
+              "flow": {
+                "type": "string",
+                "const": "client_credentials"
+              },
+              "clientSecret": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "type",
+              "tokenUrl",
+              "clientId",
+              "flow",
+              "clientSecret"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
     "run": {
       "minItems": 1,
       "type": "array",

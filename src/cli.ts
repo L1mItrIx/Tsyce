@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, relative, resolve } from 'node:path';
 import { Command, InvalidArgumentError, Option } from 'commander';
+import { AuthError, authNamesUsed, checkAuthReferences, obtainTokens } from './core/auth/oauth.js';
 import { CurlExportError, exportCurl } from './core/exporter/curl.js';
 import {
   defaultTestName,
@@ -80,8 +81,12 @@ async function runProjectCommand(projectPath: string, options: RunOptions): Prom
     else for (const [index, row] of (await readDataFile(target.data)).entries()) items.push({ file, baseDir, testRows, row, title: `${title} [row ${index + 1}]` });
   }
   validateRunVariables(items, sources);
+  const files = [...new Set(items.map((item) => item.file))];
+  const authProblems = files.flatMap((file) => checkAuthReferences(file, project.auth));
+  if (authProblems.length > 0) throw new TestFileError(authProblems.join('\n'));
   const curl = await detectCurl();
-  const perFile = await runTestFiles(items, curl.bin, sources);
+  const tokens = await obtainTokens(authNamesUsed(files), project.auth ?? {}, sources, curl.bin);
+  const perFile = await runTestFiles(items, curl.bin, sources, tokens);
   const suites = items.map((item, index) => ({ name: item.title, outcomes: perFile[index]! }));
   const report = options.reporter === 'junit' ? formatJUnitSuites(suites) : formatPrettyProject(suites, prettyOptions(options));
   process.stdout.write(`${report}\n`);
@@ -177,6 +182,7 @@ async function newCommand(path: string, options: { name?: string }): Promise<Exi
 async function exportCommand(path: string, options: ExportOptions): Promise<ExitCode> {
   const input = await readTestFile(path);
   if (input.tests.some((test) => test.capture)) throw new TestFileError('Authentication capture flows must be executed with httpi run; static curl export cannot reproduce token captures');
+  if (input.tests.some((test) => test.request.auth !== undefined)) throw new TestFileError('Requests that use auth must be executed with httpi run; static curl export cannot obtain tokens');
   if (input.tests.some((test) => test.data !== undefined)) throw new TestFileError('Tests that repeat over a data file must be executed with httpi run; static curl export does not expand the rows');
   const file = resolveVars(input, {
     cli: options.var,
@@ -197,7 +203,7 @@ async function finish(command: Promise<ExitCode>): Promise<void> {
     process.exitCode = await command;
   } catch (error) {
     if (INPUT_ERRORS.some((type) => error instanceof type)) process.exitCode = EXIT.invalid;
-    else if (error instanceof CurlUnavailableError) process.exitCode = EXIT.curl;
+    else if (error instanceof CurlUnavailableError || error instanceof AuthError) process.exitCode = EXIT.curl;
     else throw error;
     say(`httpi: ${(error as Error).message}`);
   }

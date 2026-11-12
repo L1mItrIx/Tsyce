@@ -1,8 +1,8 @@
 import { type AssertResult, checkExpectations } from './asserts.js';
 import { type RunResult, runRequest } from './runner/exec.js';
 import type { DataRow } from './data.js';
-import { resolveFormPaths } from './file.js';
-import type { TestFile } from './schema.js';
+import { resolveFormPaths, TestFileError } from './file.js';
+import type { RequestSpec, TestFile } from './schema.js';
 import { captureAuthToken, captureValue, maskSecrets } from './capture.js';
 import { resolveVars, UnresolvedVariableError, type VarSources } from './vars.js';
 
@@ -78,6 +78,17 @@ function resolvedTest(run: TestRun, sources: VarSources, runtime: VarSources['ru
   return { ...resolved, name: `${resolved.name}${run.suffix}`, ...(capture ? { capture } : {}) };
 }
 
+/** Replaces `auth: <name>` by the Authorization header carrying that token. */
+function withToken(request: RequestSpec, tokens: Record<string, string>): RequestSpec {
+  if (request.auth === undefined) return request;
+  const token = tokens[request.auth];
+  if (token === undefined) {
+    throw new TestFileError(`auth "${request.auth}" is not available: declare it under "auth" in httpi.yaml and run the project with httpi run`);
+  }
+  const { auth: _name, ...rest } = request;
+  return { ...rest, headers: { ...rest.headers, Authorization: `Bearer ${token}` } };
+}
+
 const toItems = (input: TestFile | Array<TestFile | RunItem>): RunItem[] =>
   [input].flat().map((entry) => ('file' in entry ? entry : { file: entry }));
 
@@ -110,10 +121,16 @@ export function validateRunVariables(input: TestFile | Array<TestFile | RunItem>
  * Runs several files as one flow, in order: values captured in one file are available to the
  * next ones. Returns the outcomes of each file; a file the flow never reached has none.
  */
-export async function runTestFiles(input: Array<TestFile | RunItem>, curlBin: string, sources: VarSources = EMPTY_SOURCES): Promise<TestOutcome[][]> {
+export async function runTestFiles(
+  input: Array<TestFile | RunItem>,
+  curlBin: string,
+  sources: VarSources = EMPTY_SOURCES,
+  /** Access tokens by `auth` name, obtained before the run (see auth/oauth.ts). */
+  tokens: Record<string, string> = {},
+): Promise<TestOutcome[][]> {
   const items = toItems(input);
   validateRunVariables(items, sources);
-  const secrets: string[] = [];
+  const secrets: string[] = Object.values(tokens);
   const names = captureNames(items);
   const runtime: Record<string, string | undefined> | undefined = names.length > 0 ? Object.fromEntries(names.map((name) => [name, undefined])) : undefined;
   const perFile: TestOutcome[][] = items.map(() => []);
@@ -121,7 +138,8 @@ export async function runTestFiles(input: Array<TestFile | RunItem>, curlBin: st
     const outcomes = perFile[index]!;
     for (const run of testRuns(item)) {
       const test = resolvedTest(run, sources, runtime ?? sources.runtime);
-      const result = await runRequest(curlBin, item.baseDir === undefined ? test.request : resolveFormPaths(test.request, item.baseDir));
+      const request = withToken(test.request, tokens);
+      const result = await runRequest(curlBin, item.baseDir === undefined ? request : resolveFormPaths(request, item.baseDir));
       const asserts = result.error === null ? checkExpectations(test.expect, result) : [];
       if (!test.capture || !runtime) { outcomes.push({ name: test.name, result, asserts }); continue; }
 

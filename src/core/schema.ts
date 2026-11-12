@@ -20,6 +20,8 @@ export const requestSchema = z.strictObject({
   insecure: z.boolean().optional(),
   compressed: z.boolean().optional(),
   timeoutMs: z.number().positive().optional(),
+  /** Name of an `auth` block of httpi.yaml: its token is sent as `Authorization: Bearer`. */
+  auth: z.string().min(1).optional(),
 });
 
 export type RequestSpec = z.infer<typeof requestSchema>;
@@ -112,6 +114,22 @@ export const localFileSchema = z.record(z.string(), z.union([z.string(), z.numbe
 
 const projectPath = z.string().min(1);
 
+const oauthCommon = {
+  type: z.literal('oauth2'),
+  tokenUrl: z.string().min(1),
+  clientId: z.string().min(1),
+  scopes: z.array(z.string().min(1)).optional(),
+  /** How the client identifies itself to the token endpoint: HTTP Basic (default) or fields in the body. */
+  clientAuth: z.enum(['basic', 'body']).optional(),
+};
+
+/** How to obtain an access token. Secrets belong in `${ENV}` references, never in the file. */
+export const authSchema = z.discriminatedUnion('flow', [
+  z.strictObject({ ...oauthCommon, flow: z.literal('client_credentials'), clientSecret: z.string().min(1) }),
+]);
+
+export type AuthConfig = z.infer<typeof authSchema>;
+
 /** One entry of `run:` — a test file, or a pattern such as `tests/admin/*.yaml`. */
 export const runEntrySchema = z.union(
   [
@@ -136,6 +154,8 @@ export const projectFileSchema = z.strictObject({
       environments: envFileSchema,
     })
     .optional(),
+  /** Named ways to obtain a token; a request picks one with `auth: <name>`. */
+  auth: z.record(z.string().regex(/^[A-Za-z_][\w-]*$/, 'auth name must be a simple name, e.g. main'), authSchema).optional(),
   run: z.array(runEntrySchema).min(1),
   report: z
     .strictObject({
