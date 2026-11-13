@@ -19,7 +19,7 @@ git status -sb && git log --oneline -10 && git branch -a
 
 - Si hay una `[~]` en curso, termínala antes de abrir otra.
 - Si no, toma la primera `[ ]` en orden. No saltes de fase: cada una depende de la anterior.
-- Si el usuario pidió algo que no está en `PROGRESS.md`, pregunta si se añade antes de hacerlo.
+- Si el usuario pidió explícitamente algo que no está en `PROGRESS.md`, añádelo como tarea autorizada y fija su alcance. Pregunta solo si falta información indispensable o hay una contradicción que la sesión no resuelve.
 - Si la fase anterior quedó en una rama sin integrar a `main`, avisa al usuario y continúa sobre esa rama; no la reimplementes.
 
 ## 3. Comprueba que no exista ya
@@ -29,6 +29,11 @@ Antes de crear un archivo, función o tipo:
 - Busca por nombre y por concepto en `src/` y `test/` (Grep/Glob).
 - Mira el mapa de carpetas en `PLAN.md` §9: cada responsabilidad tiene un único archivo.
 - Si existe algo parecido, extiéndelo. Si existe y está mal, corrígelo ahí; no crees una segunda versión.
+
+En tareas no triviales, lee `httpi-paralelo` y anuncia el reparto antes de delegar.
+Una tarea puede tener varios subencargos independientes sin abrir otras tareas ni
+saltar dependencias del plan. Identifica las demás skills pertinentes por su
+descripción y lee sus instrucciones antes de aplicarlas.
 
 ## 4. Fija el alcance antes de escribir
 
@@ -43,8 +48,8 @@ Si durante el trabajo necesitas tocar algo fuera de esa lista, detente y justifi
 ## 5. Marca y trabaja
 
 - Cambia la tarea a `[~]` en `PROGRESS.md` e indica la rama.
-- Rama: `fase-<n>-<slug>` (una por fase, no por tarea).
-- Escribe primero el test que define "hecho", luego el código mínimo que lo pasa.
+- Conserva la rama indicada por el usuario (actualmente `claude/bold-albattani-fsyz04`). Solo cuando no exista una instrucción de rama, usa `fase-<n>-<slug>` (una por fase, no por tarea).
+- Para cambios de comportamiento, escribe primero el test que define "hecho", luego el código mínimo que lo pasa. En instrucciones o documentación, verifica enlaces, coherencia y diff como indica `httpi-entrega`; no añadas tests que solo repitan el texto.
 - Al terminar, usa la skill `httpi-entrega`.
 
 ## No hagas

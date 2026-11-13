@@ -19,7 +19,9 @@ npm run check
 
 ## 2. Comprueba que hay prueba nueva
 
-Cada tarea entrega al menos un test que fallaría sin el cambio. Sin test, la tarea no está hecha.
+Cada cambio de comportamiento entrega al menos un test que fallaría sin él.
+Los cambios solo de instrucciones/documentación se verifican revisando coherencia,
+enlaces/rutas y `git diff --check`; no necesitan tests que repitan el texto.
 
 | Si tocaste | Debe existir |
 |---|---|
@@ -30,6 +32,10 @@ Cada tarea entrega al menos un test que fallaría sin el cambio. Sin test, la ta
 | `cli.ts` | Test e2e del código de salida |
 
 ## 3. Revisa tu propio diff
+
+En cambios sustanciales, sigue `httpi-paralelo` y pide a un subagente una revisión
+independiente de la versión integrada y estable antes de hacer commit. El principal
+contrasta sus hallazgos; si no hay subagentes disponibles, explica el límite.
 
 ```bash
 git status -sb && git diff --stat && git diff
@@ -58,9 +64,17 @@ Quita antes de seguir:
 git push -u origin <rama>
 ```
 
-- El hook vuelve a correr `npm run check`. Si bloquea, no uses `--no-verify` ni toques el hook.
+- El hook de Claude vuelve a correr `npm run check` cuando está activo; en otros clientes no se presupone esa protección. Si bloquea, no uses `--no-verify` ni lo modifiques.
 - No abras un pull request salvo que el usuario lo pida.
 
-## 6. Informa
+## 6. Verifica CI e informa
 
-Al usuario, en pocas líneas: qué tarea quedó, qué se probó y con qué resultado, qué no se pudo verificar (p. ej. Windows hasta que corra CI) y cuál es la siguiente tarea.
+Después del push, consulta el workflow del SHA exacto que subiste y comprueba
+todos los jobs de Ubuntu, macOS y Windows con Node 22/24. Un job verde no equivale
+a la matriz completa. Si hay un fallo, lee sus logs y corrige la causa antes de dar
+el cierre por verificado; un reintento exitoso por sí solo no arregla un test inestable.
+Si el CI sigue pendiente o no es accesible, dilo con el enlace y lo que sí se comprobó.
+
+Al usuario, en pocas líneas: qué tarea quedó, qué se delegó, qué se probó y con qué
+resultado, qué no se pudo verificar y cuál es la siguiente tarea. No abras el PR
+pendiente a `main` ni publiques npm sin la instrucción correspondiente del usuario.

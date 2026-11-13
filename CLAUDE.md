@@ -4,6 +4,9 @@ CLI/TUI para probar APIs con curl por debajo. Promesa única:
 
 > "Pega un curl o responde unas preguntas, y obtienes una prueba de API lista para correr en CI."
 
+Estas reglas y las skills de `.claude/skills/` se aplican a Claude, Codex y sus
+subagentes. `AGENTS.md` dirige a Codex a esta misma fuente; no mantiene otro plan.
+
 ## Fuentes de verdad (no las dupliques)
 
 | Archivo | Contiene | Regla |
@@ -18,10 +21,16 @@ No crees otros documentos de plan, notas o resúmenes. Si algo no cabe en esos t
 
 1. **Antes de escribir código:** skill `httpi-tarea`.
 2. **Antes de cada commit/push:** skill `httpi-entrega`.
-3. **Si vas a usar subagentes:** skill `httpi-paralelo`.
+3. **Al comenzar una tarea no trivial:** skill `httpi-paralelo`. Delega cuando haya trabajo independiente útil y herramientas de subagentes disponibles; incluye revisión independiente en cambios sustanciales.
 4. **Si tocas el importador de curl:** skill `httpi-caso-curl`.
 
-Un hook bloquea `git push` cuando `npm run check` falla. No lo esquives (`--no-verify`, editar el hook, quitar tests): arregla la causa.
+El hook de `.claude/settings.json` verifica los pushes de Claude. No asumas que
+protege otros clientes: todos deben ejecutar y comprobar `npm run check` antes
+de subir. No esquives un hook activo (`--no-verify`, editarlo, quitar tests).
+
+Usa las skills pertinentes al trabajo y sus referencias necesarias. No actives
+skills ajenas al problema por el solo hecho de estar disponibles. Si una capacidad
+necesaria no está disponible, informa el límite concreto y continúa lo posible.
 
 ## Alcance
 
@@ -45,7 +54,7 @@ Fuera de alcance (no implementar, aunque parezca fácil): GraphQL/gRPC, ejecuci�
 npm run check
 ```
 
-`check` = typecheck + tests + build. Debe existir desde la fase 0 y pasar antes de cualquier push.
+`check` = typecheck → build → tests. Debe existir desde la fase 0 y pasar antes de cualquier push.
 
 ## Idioma
 
