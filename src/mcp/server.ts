@@ -47,7 +47,7 @@ export async function serveMcp(options: McpOptions, input: Readable = process.st
     } catch (cause) {
       // Parser and network diagnostics can contain credentials; expose only controlled errors.
       const controlled = cause instanceof Error && cause.constructor === Error;
-      const message = controlled && /^(Use a relative|Path must|Creating flows requires|Executing flows requires|Environment is not|Environment file must|In MCP flows|Request origin is not|MCP flows cannot|Multipart forms are)/.test(cause.message)
+      const message = controlled && /^(Use a relative|Path must|Creating flows requires|Executing flows requires|Environment is not|Environment file must|In MCP flows|Request origin is not|MCP flows cannot|Multipart forms are|Requests that use auth only run|Every file the project runs must|Every data file must|Local values file must)/.test(cause.message)
         ? cause.message : 'Tool failed: check the file, variables, environment and curl locally; diagnostic details withheld to protect credentials';
       send({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: message }], isError: true } });
     }

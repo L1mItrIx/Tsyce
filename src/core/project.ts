@@ -1,7 +1,10 @@
 import { existsSync } from 'node:fs';
 import { glob, mkdir, readFile, writeFile } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
-import { ENV_FILE_NAME, parseWith, readEnvironment, readTextFile, TestFileError } from './file.js';
+import { basename, dirname, join, relative, resolve } from 'node:path';
+import { readDataFile, readTestRows } from './data.js';
+import { ENV_FILE_NAME, parseWith, readEnvironment, readTestFile, readTextFile, TestFileError } from './file.js';
+import type { RunItem } from './run.js';
+import { resolveVars, type VarSources } from './vars.js';
 import { type AuthConfig, localFileSchema, type ProjectFile, projectFileSchema } from './schema.js';
 import { parseDocument, stringify } from 'yaml';
 
@@ -219,4 +222,24 @@ export async function addAuthBlock(projectPath: string, name: string, block: Aut
   const document = parseDocument(await readTextFile(projectPath));
   document.setIn(['auth', name], document.createNode(block));
   await writeFile(projectPath, document.toString({ lineWidth: 0 }));
+}
+
+/** One item of a project run, with the title it gets in reports. */
+export type ProjectRunItem = RunItem & { title: string; path: string };
+
+/**
+ * Reads every file `run:` lists, as the items of one run: a file per item, or one item per row
+ * when its run entry repeats it over a data file. Titles are the file's name, or its path.
+ */
+export async function loadProjectRun(project: ProjectFile, projectPath: string, sources: VarSources): Promise<ProjectRunItem[]> {
+  const items: ProjectRunItem[] = [];
+  for (const target of await expandRun(project, projectPath)) {
+    const file = await readTestFile(target.file);
+    const testRows = await readTestRows(file, target.file);
+    const title = resolveVars(file.name, sources) ?? relative(dirname(projectPath), target.file).replaceAll('\\', '/');
+    const base = { file, baseDir: dirname(target.file), testRows, path: target.file };
+    if (target.data === undefined) items.push({ ...base, title });
+    else for (const [index, row] of (await readDataFile(target.data)).entries()) items.push({ ...base, row, title: `${title} [row ${index + 1}]` });
+  }
+  return items;
 }

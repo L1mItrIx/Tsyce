@@ -118,6 +118,17 @@ export function validateRunVariables(input: TestFile | Array<TestFile | RunItem>
 }
 
 /**
+ * Every request a run would send, in order and resolved, with each captured value replaced by
+ * `placeholder`: what a caller checks before allowing the run (for instance the MCP server).
+ */
+export function plannedRequests(input: Array<TestFile | RunItem>, sources: VarSources = EMPTY_SOURCES, placeholder = '[captured]'): Array<{ template: TestFile['tests'][number]; request: RequestSpec }> {
+  const items = toItems(input);
+  validateRunVariables(items, sources);
+  const runtime = Object.fromEntries(captureNames(items).map((name) => [name, placeholder]));
+  return items.flatMap((item) => testRuns(item).map((run) => ({ template: run.template, request: resolvedTest(run, sources, runtime).request })));
+}
+
+/**
  * Runs several files as one flow, in order: values captured in one file are available to the
  * next ones. Returns the outcomes of each file; a file the flow never reached has none.
  */

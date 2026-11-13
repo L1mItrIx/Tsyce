@@ -25,11 +25,11 @@ import { importOpenApi } from './core/importer/openapi.js';
 import { type ImportedProject, importPostman, importPostmanEnvironment } from './core/importer/postman.js';
 import { CurlImportError, extractSecrets, mapFlags } from './core/importer/map-flags.js';
 import { ShellSyntaxError } from './core/importer/tokenize-bash.js';
-import { addAuthBlock, expandRun, findProjectFile, initProject, mergeIntoProject, PROJECT_FILE_NAME, projectEnvironment, readLocalValues, readProjectFile } from './core/project.js';
+import { addAuthBlock, findProjectFile, initProject, loadProjectRun, mergeIntoProject, PROJECT_FILE_NAME, projectEnvironment, readLocalValues, readProjectFile } from './core/project.js';
 import { formatPretty, formatPrettyProject } from './core/reporter/pretty.js';
 import { formatJUnit, formatJUnitSuites } from './core/reporter/junit.js';
-import { readDataFile, readTestRows } from './core/data.js';
-import { EXIT, type ExitCode, exitCodeFor, type RunItem, runTestFiles, validateRunVariables } from './core/run.js';
+import { readTestRows } from './core/data.js';
+import { EXIT, type ExitCode, exitCodeFor, runTestFiles, validateRunVariables } from './core/run.js';
 import { detectCurl } from './core/runner/detect.js';
 import { CurlUnavailableError, runRequest } from './core/runner/exec.js';
 import type { TestFile } from './core/schema.js';
@@ -76,16 +76,7 @@ async function runProjectCommand(projectPath: string, options: RunOptions): Prom
   for (const warning of environment.warnings) say(`warning: ${warning}`);
   const sources = { cli: options.var, system: process.env, local: await readLocalValues(projectPath), file: environment.variables };
 
-  // One item per file, or one per row when the run entry repeats the file over a data file.
-  const items: Array<RunItem & { title: string }> = [];
-  for (const target of await expandRun(project, projectPath)) {
-    const file = await readTestFile(target.file);
-    const testRows = await readTestRows(file, target.file);
-    const title = resolveVars(file.name, sources) ?? relative(dirname(projectPath), target.file).replaceAll('\\', '/');
-    const baseDir = dirname(target.file);
-    if (target.data === undefined) items.push({ file, baseDir, testRows, title });
-    else for (const [index, row] of (await readDataFile(target.data)).entries()) items.push({ file, baseDir, testRows, row, title: `${title} [row ${index + 1}]` });
-  }
+  const items = await loadProjectRun(project, projectPath, sources);
   validateRunVariables(items, sources);
   const files = [...new Set(items.map((item) => item.file))];
   const authProblems = files.flatMap((file) => checkAuthReferences(file, project.auth));
