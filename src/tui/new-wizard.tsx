@@ -9,19 +9,23 @@ import { AssertionMenu } from './assertion-menu.js';
 import { MouseTarget } from './mouse-controls.js';
 import { TokenPicker } from './token-picker.js';
 
-export type SendRequest = (request: RequestSpec, signal: AbortSignal) => Promise<RunResult>;
+/** Sends one request; `data` is the data file of the test, whose first row fills {{data.<column>}}. */
+export type SendRequest = (request: RequestSpec, signal: AbortSignal, data?: string) => Promise<RunResult>;
 export type CapturedAuth = { capture: { authToken: string }; value: string };
 type NewWizardProps = {
   sendRequest: SendRequest;
-  onComplete: (request: RequestSpec, expected: Expect, auth?: CapturedAuth) => void;
+  onComplete: (request: RequestSpec, expected: Expect, auth?: CapturedAuth, data?: string) => void;
   onCancel: () => void;
   onError?: (error: Error) => void;
   actionLabel?: string;
   hasCapturedToken?: boolean;
   sensitiveValues?: string[];
+  /** Directory of the YAML being written (see RequestWizard). */
+  baseDir?: string;
 };
 
-export function NewWizard({ sendRequest, onComplete, onCancel, onError, actionLabel = 'Save test', hasCapturedToken = false, sensitiveValues = [] }: NewWizardProps) {
+export function NewWizard({ sendRequest, onComplete, onCancel, onError, actionLabel = 'Save test', hasCapturedToken = false, sensitiveValues = [], baseDir }: NewWizardProps) {
+  const [data, setData] = useState<string | undefined>(undefined);
   const [mode, setMode] = useState<'form' | 'running' | 'asserts' | 'error' | 'token'>('form');
   const [request, setRequest] = useState<RequestSpec | null>(null);
   const [response, setResponse] = useState<RunResult | null>(null);
@@ -37,12 +41,12 @@ export function NewWizard({ sendRequest, onComplete, onCancel, onError, actionLa
     controller.current.abort();
     onCancel();
   };
-  const send = async (value: RequestSpec) => {
+  const send = async (value: RequestSpec, dataFile: string | undefined = data) => {
     if (finished.current || sending.current) return;
     sending.current = true;
-    setRequest(value); setMode('running'); setError('');
+    setRequest(value); setData(dataFile); setMode('running'); setError('');
     try {
-      const result = await sendRequest(value, controller.current.signal);
+      const result = await sendRequest(value, controller.current.signal, dataFile);
       if (finished.current) return;
       if (result.error !== null) { setError(maskSecrets(result.error, sensitiveValues)); setMode('error'); }
       else { setResponse(result); setMode('asserts'); }
@@ -60,7 +64,8 @@ export function NewWizard({ sendRequest, onComplete, onCancel, onError, actionLa
     else if (mode === 'error' && key.return && request) void send(request);
     else if (mode === 'error' && key.escape) setMode('form');
   }, { isActive: mode === 'running' || mode === 'error' });
-  if (mode === 'form') return <RequestWizard hasCapturedToken={hasCapturedToken} onComplete={(value) => { void send(value); }} onCancel={cancel} />;
+  if (mode === 'form') return <RequestWizard hasCapturedToken={hasCapturedToken} {...(baseDir !== undefined && { baseDir })}
+    onComplete={(value, dataFile) => { void send(value, dataFile); }} onCancel={cancel} />;
   if (mode === 'token' && response) return <TokenPicker result={response} onBack={() => setMode('asserts')} onCancel={cancel} onSelect={(path) => {
     const capture = { authToken: path };
     setAuth({ capture, value: captureAuthToken(response, capture) });
@@ -73,7 +78,7 @@ export function NewWizard({ sendRequest, onComplete, onCancel, onError, actionLa
     onComplete={(expected) => {
     if (finished.current) return;
     finished.current = true;
-    if (auth) onComplete(request, expected, auth); else onComplete(request, expected);
+    onComplete(request, expected, auth ?? undefined, data);
   }} />;
   return <Box flexDirection="column">
     <Text>{mode === 'running' ? 'Sending request… Ctrl+C: cancel' : `Request failed: ${JSON.stringify(error)}`}</Text>

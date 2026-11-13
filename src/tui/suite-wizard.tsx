@@ -1,15 +1,28 @@
 import { useRef, useState } from 'react';
 import { Box, Text, render, useInput } from 'ink';
 import type { TestCase } from '../core/schema.js';
-import { defaultTestName } from '../core/file.js';
+import { resolve } from 'node:path';
+import { readDataFile } from '../core/data.js';
+import { defaultTestName, TestFileError } from '../core/file.js';
+import type { RunResult } from '../core/runner/exec.js';
 import { NewWizard, type SendRequest } from './new-wizard.js';
 import { MouseProvider, MouseTarget } from './mouse-controls.js';
-import { resolveVars } from '../core/vars.js';
+import { resolveVars, UnresolvedVariableError } from '../core/vars.js';
 import { maskSecrets } from '../core/capture.js';
 
-type SuiteWizardProps = { sendRequest: SendRequest; onComplete: (tests: TestCase[]) => void; onCancel: () => void; onError?: (error: Error) => void };
+type SuiteWizardProps = {
+  sendRequest: SendRequest;
+  onComplete: (tests: TestCase[]) => void;
+  onCancel: () => void;
+  onError?: (error: Error) => void;
+  /** Directory of the YAML being written: data files and uploads are relative to it. */
+  baseDir?: string;
+};
 
-export function SuiteWizard({ sendRequest, onComplete, onCancel, ...options }: SuiteWizardProps) {
+/** A request that could not be sent, shown like a network error so the person can fix it and retry. */
+const notSent = (error: string): RunResult => ({ status: 0, timeMs: 0, headers: {}, body: '', curlExitCode: 0, error });
+
+export function SuiteWizard({ sendRequest, onComplete, onCancel, baseDir = process.cwd(), ...options }: SuiteWizardProps) {
   const [tests, setTests] = useState<TestCase[]>([]);
   const [editing, setEditing] = useState(true);
   const [token, setToken] = useState<string | null>(null);
@@ -23,13 +36,22 @@ export function SuiteWizard({ sendRequest, onComplete, onCancel, ...options }: S
     else if (key.return) save();
   }, { isActive: !editing });
   if (editing) return <NewWizard key={tests.length} hasCapturedToken={token !== null} sensitiveValues={token ? [token] : []}
-    sendRequest={async (request, signal) => {
-      const resolved = resolveVars(request, { cli: {}, system: process.env, file: {}, runtime: { authToken: token ?? undefined } });
-      try { return await sendRequest(resolved, signal); }
+    baseDir={baseDir}
+    sendRequest={async (request, signal, data) => {
+      let resolved: typeof request;
+      try {
+        // The live request uses the first row; the saved test will run every row.
+        const row = data === undefined ? undefined : (await readDataFile(resolve(baseDir, data)))[0];
+        resolved = resolveVars(request, { cli: {}, system: process.env, file: {}, runtime: { authToken: token ?? undefined }, ...(row !== undefined && { data: row }) });
+      } catch (cause) {
+        if (!(cause instanceof TestFileError || cause instanceof UnresolvedVariableError)) throw cause;
+        return notSent(cause.message);
+      }
+      try { return await sendRequest(resolved, signal, data); }
       catch (cause) { throw new Error(maskSecrets((cause as Error).message, token ? [token] : [])); }
     }} {...options} actionLabel="Add request"
-    onComplete={(request, expected, auth) => {
-      setTests((previous) => [...previous, { name: defaultTestName(request), request, expect: expected, ...(auth ? { capture: auth.capture } : {}) }]);
+    onComplete={(request, expected, auth, data) => {
+      setTests((previous) => [...previous, { name: defaultTestName(request), request, expect: expected, ...(auth ? { capture: auth.capture } : {}), ...(data !== undefined ? { data } : {}) }]);
       if (auth) setToken(auth.value);
       setEditing(false);
     }} onCancel={() => { if (tests.length > 0) setEditing(false); else cancel(); }} />;
@@ -49,11 +71,11 @@ export function SuiteWizard({ sendRequest, onComplete, onCancel, ...options }: S
 }
 
 /** Runs the multi-request editor on stderr and restores the terminal before writing the file. */
-export async function launchWizard(sendRequest: SendRequest): Promise<TestCase[] | null> {
+export async function launchWizard(sendRequest: SendRequest, baseDir: string = process.cwd()): Promise<TestCase[] | null> {
   let instance: ReturnType<typeof render> | undefined;
   try {
     return await new Promise<TestCase[] | null>((resolve, reject) => {
-      instance = render(<MouseProvider><SuiteWizard sendRequest={sendRequest}
+      instance = render(<MouseProvider><SuiteWizard sendRequest={sendRequest} baseDir={baseDir}
         onComplete={resolve} onCancel={() => resolve(null)} onError={reject} /></MouseProvider>,
       { stdout: process.stderr, exitOnCtrlC: false, patchConsole: false, alternateScreen: true, interactive: true });
     });

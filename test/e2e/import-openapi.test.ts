@@ -86,3 +86,12 @@ test.each<[name: string, args: string[], stdin: string, stderr: RegExp]>([
   expect(await readdir(dir)).toEqual([]);
   expect(result.code).toBe(2);
 });
+
+test('import --pick needs an interactive terminal and cannot be combined with a source file', async () => {
+  const piped = await httpi(['import', '--pick'], { cwd: dir, stdin: '' });
+  expect(piped.stderr).toContain('--pick requires an interactive terminal; pass the source file instead');
+  expect(piped.code).toBe(2);
+  const both = await httpi(['import', 'a.yaml', '--pick'], { cwd: dir });
+  expect(both.stderr).toContain('pass either a source file or --pick, not both');
+  expect(both.code).toBe(2);
+});

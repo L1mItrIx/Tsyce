@@ -1,8 +1,8 @@
 import { readdir } from 'node:fs/promises';
 import { useEffect, useReducer, useRef } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, render, Text, useInput } from 'ink';
 import { createPickerState, pickerReducer } from './file-picker-state.js';
-import { MouseTarget } from './mouse-controls.js';
+import { MouseProvider, MouseTarget } from './mouse-controls.js';
 
 export type FilePickerProps = {
   /** Directory shown first (absolute). */
@@ -74,4 +74,18 @@ export function FilePicker({ startDir, extensions = [], title, hint, onSelect, o
     <Text dimColor>↑/↓: move · Enter or →: open · ← or Backspace: parent folder · Esc: cancel</Text>
     <MouseTarget onClick={() => dispatch({ type: 'cancel' })}><Text>[ Cancel ]</Text></MouseTarget>
   </Box>;
+}
+
+/** Runs the picker on its own screen (stderr) and resolves with the chosen file, or null when cancelled. */
+export async function launchFilePicker(options: Omit<FilePickerProps, 'onSelect' | 'onCancel'>): Promise<string | null> {
+  let instance: ReturnType<typeof render> | undefined;
+  try {
+    return await new Promise<string | null>((resolve) => {
+      instance = render(<MouseProvider><FilePicker {...options} onSelect={resolve} onCancel={() => resolve(null)} /></MouseProvider>,
+        { stdout: process.stderr, exitOnCtrlC: false, patchConsole: false, alternateScreen: true, interactive: true });
+    });
+  } finally {
+    instance?.unmount();
+    await instance?.waitUntilExit();
+  }
 }

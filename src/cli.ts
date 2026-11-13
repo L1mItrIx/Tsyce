@@ -15,6 +15,7 @@ import {
   readEnvironment,
   readTestFile,
   readTextFile,
+  resolveFormPaths,
   stringifyTestFile,
   TestFileError,
   writeTestFile,
@@ -214,7 +215,7 @@ async function initCommand(directory: string): Promise<ExitCode> {
   return EXIT.ok;
 }
 
-type ImportOptions = { from?: ImportSource; dialect?: Dialect; output?: string; name?: string; keepSecrets?: true; environment?: string };
+type ImportOptions = { from?: ImportSource; dialect?: Dialect; output?: string; name?: string; keepSecrets?: true; environment?: string; pick?: true };
 
 async function importCurl(pasted: string, options: ImportOptions): Promise<ExitCode> {
   const { dialect, tokens } = tokenizeCurl(pasted, options.dialect);
@@ -274,7 +275,17 @@ async function writeImportedProject(imported: ImportedProject, title: string, op
   return EXIT.ok;
 }
 
-async function importCommand(sourceFile: string | undefined, options: ImportOptions): Promise<ExitCode> {
+async function importCommand(givenFile: string | undefined, options: ImportOptions): Promise<ExitCode> {
+  let sourceFile = givenFile;
+  if (options.pick) {
+    if (sourceFile !== undefined) throw new TestFileError('pass either a source file or --pick, not both');
+    if (!process.stdin.isTTY || !process.stderr.isTTY) throw new TestFileError('--pick requires an interactive terminal; pass the source file instead');
+    const { launchFilePicker } = await import('./tui/file-picker.js');
+    const picked = await launchFilePicker({ startDir: process.cwd(), title: 'Choose what to import', hint: 'A file with a curl command, a Postman collection (.json) or an OpenAPI document (.yaml, .json).' });
+    if (picked === null) { say('httpi: cancelled; nothing was imported'); return EXIT.ok; }
+    say(`httpi: importing ${relative(process.cwd(), picked) || picked}`);
+    sourceFile = picked;
+  }
   if (sourceFile === undefined && process.stdin.isTTY) {
     say('Paste the curl command or the collection, then press Ctrl+D (on Windows: Ctrl+Z, then Enter).');
   }
@@ -305,7 +316,9 @@ async function newCommand(path: string, options: { name?: string }): Promise<Exi
   if (existsSync(path)) throw new TestFileError(`${path}: file already exists; choose a new destination`);
   const curl = await detectCurl();
   const { launchWizard } = await import('./tui/suite-wizard.js');
-  const completed = await launchWizard((request, signal) => runRequest(curl.bin, request, signal));
+  // Uploads chosen in the wizard are relative to the new YAML, as they will be when it runs.
+  const baseDir = dirname(resolve(path));
+  const completed = await launchWizard((request, signal) => runRequest(curl.bin, resolveFormPaths(request, baseDir), signal), baseDir);
   if (completed === null) { say('httpi: cancelled; no file written'); return EXIT.ok; }
   const { file, secrets } = prepareWizardFile(completed, options.name);
   await writeTestFile(path, file);
@@ -422,6 +435,7 @@ program
   .option('--name <name>', 'curl only: name of the test (default: method and path)')
   .option('--environment <file>', 'Postman only: environment export whose variables become an environment of httpi.yaml')
   .option('--keep-secrets', 'keep Authorization and Cookie values in the files instead of {{variables}}')
+  .option('--pick', 'choose the source file in a file browser (interactive terminal)')
   .action((sourceFile: string | undefined, options: ImportOptions) => finish(importCommand(sourceFile, options)));
 
 program

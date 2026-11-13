@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { createWizardState, HTTP_METHODS, wizardReducer } from '../../src/tui/wizard-state.js';
 
 const submit = (state: ReturnType<typeof createWizardState>, value: string) =>
@@ -93,4 +93,47 @@ test('captured-token header replaces manual Authorization without exposing the t
   const next = wizardReducer(state, { type: 'use-captured-token' });
   expect(next.input).toBe('X-Test: yes\nAuthorization: Bearer {{authToken}}');
   expect(wizardReducer(next, { type: 'use-captured-token' }).input).toBe(next.input);
+});
+
+describe('files and data in the wizard', () => {
+  const atBody = () => ([
+    { type: 'input', value: 'POST' }, { type: 'next' },
+    { type: 'input', value: 'https://api.example/upload' }, { type: 'next' },
+    { type: 'next' },
+  ] as const).reduce(wizardReducer, createWizardState());
+
+  test('attaching a file sends it as a multipart form and goes to the review', () => {
+    const state = wizardReducer(atBody(), { type: 'attach-file', path: 'files/a b.pdf' });
+    expect(state.step).toBe('review');
+    expect(state.request.body).toEqual({ form: ['file=@files/a b.pdf'] });
+  });
+
+  test('going back keeps the attached file unless text replaces it or "no body" removes it', () => {
+    const attached = wizardReducer(wizardReducer(atBody(), { type: 'attach-file', path: 'a.pdf' }), { type: 'back' });
+    expect([attached.step, attached.input]).toEqual(['body', '']);
+    expect(wizardReducer(attached, { type: 'next' }).request.body).toEqual({ form: ['file=@a.pdf'] });
+    const typed = wizardReducer(wizardReducer(attached, { type: 'input', value: 'hello' }), { type: 'next' });
+    expect(typed.request.body).toEqual({ text: 'hello' });
+    const none = wizardReducer(attached, { type: 'no-body' });
+    expect(none.step).toBe('review');
+    expect(none.request.body).toBeUndefined();
+  });
+
+  test('a data file is chosen at the review, kept through edits, and can be removed', () => {
+    const review = wizardReducer(atBody(), { type: 'no-body' });
+    const withData = wizardReducer(review, { type: 'use-data', path: 'data/users.csv' });
+    expect(withData.data).toBe('data/users.csv');
+    const edited = wizardReducer(wizardReducer(withData, { type: 'back' }), { type: 'next' });
+    expect(edited.data).toBe('data/users.csv');
+    expect(wizardReducer(withData, { type: 'clear-data' }).data).toBeUndefined();
+    expect(wizardReducer(withData, { type: 'next' })).toMatchObject({ step: 'ready', data: 'data/users.csv' });
+  });
+
+  test('these actions do nothing outside their step', () => {
+    const start = createWizardState();
+    expect(wizardReducer(start, { type: 'attach-file', path: 'a' })).toBe(start);
+    expect(wizardReducer(start, { type: 'no-body' })).toBe(start);
+    expect(wizardReducer(start, { type: 'use-data', path: 'a.csv' })).toBe(start);
+    expect(wizardReducer(start, { type: 'clear-data' })).toBe(start);
+  });
 });

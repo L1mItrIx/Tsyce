@@ -6,10 +6,16 @@ export const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'O
 const wizardStateSchema = z.object({
   step: z.enum(steps), input: z.string(), error: z.string().nullable(),
   request: requestSchema.extend({ url: z.string() }),
+  /** Data file the test repeats over, relative to the YAML being written. */
+  data: z.string().optional(),
 });
 export type WizardState = z.infer<typeof wizardStateSchema>;
 export type WizardAction = { type: 'input'; value: string } | { type: 'next' | 'back' | 'cancel' }
-  | { type: 'move-method'; direction: -1 | 1 } | { type: 'json-example' | 'use-captured-token' };
+  | { type: 'move-method'; direction: -1 | 1 } | { type: 'json-example' | 'use-captured-token' }
+  /** Body step: send this file (a path relative to the YAML) as a multipart form, or send no body. */
+  | { type: 'attach-file'; path: string } | { type: 'no-body' }
+  /** Review step: repeat the test once per row of this data file, or stop doing so. */
+  | { type: 'use-data'; path: string } | { type: 'clear-data' };
 
 export function createWizardState(): WizardState {
   return { step: 'method', input: '', error: null, request: { method: 'GET', url: '', headers: {} } };
@@ -60,6 +66,18 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
     const headers = hasContentType ? state.request.headers : { ...state.request.headers, 'Content-Type': 'application/json' };
     return { ...state, input: '{\n  "name": "Ana"\n}', request: { ...state.request, headers }, error: null };
   }
+  if (action.type === 'attach-file' || action.type === 'no-body') {
+    if (state.step !== 'body') return state;
+    const { body: _body, ...rest } = state.request;
+    // The file goes in a form field named "file"; curl sends its name and content.
+    const request = action.type === 'no-body' ? rest : { ...rest, body: { form: [`file=@${action.path}`] } };
+    return { ...state, step: 'review', request, input: '', error: null };
+  }
+  if (action.type === 'use-data' || action.type === 'clear-data') {
+    if (state.step !== 'review') return state;
+    const { data: _data, ...rest } = state;
+    return action.type === 'use-data' ? { ...rest, data: action.path, error: null } : { ...rest, error: null };
+  }
   if (action.type === 'move-method') {
     if (state.step !== 'method') return state;
     const method = state.input.trim().toUpperCase() || state.request.method;
@@ -93,13 +111,15 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
       case 'headers': request = { ...request, headers: parseHeaders(state.input) }; break;
       case 'body': {
         const { body: _body, ...rest } = request;
-        request = state.input === '' ? rest : { ...rest, body: { text: state.input } };
+        // An attached file stays until text replaces it or "no body" removes it.
+        const keepFile = state.input === '' && request.body !== undefined && 'form' in request.body;
+        request = keepFile ? request : state.input === '' ? rest : { ...rest, body: { text: state.input } };
         break;
       }
       case 'review': request = requestSchema.parse(request); break;
     }
     const step = steps[index + 1]!;
-    return { step, request, input: savedInput(step, request), error: null };
+    return { ...state, step, request, input: savedInput(step, request), error: null };
   } catch (error) {
     return { ...state, error: (error as Error).message };
   }
