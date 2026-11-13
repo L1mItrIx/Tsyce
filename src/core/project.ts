@@ -167,6 +167,51 @@ export async function initProject(dir: string): Promise<InitStep[]> {
   return steps;
 }
 
+/** What an importer found besides the tests: goes into httpi.yaml. */
+export type ProjectAdditions = { name: string; auth: Record<string, AuthConfig>; environment?: { name: string; variables: Record<string, string> } };
+
+/**
+ * Puts the auth blocks and the environment of an import into `<dir>/httpi.yaml`: creates the
+ * file when there is none, otherwise adds only what is not there yet (comments are kept).
+ * Returns one line per thing it did or left alone.
+ */
+export async function mergeIntoProject(dir: string, additions: ProjectAdditions): Promise<string[]> {
+  const projectPath = join(resolve(dir), PROJECT_FILE_NAME);
+  const { auth, environment } = additions;
+  if (!existsSync(projectPath)) {
+    const project: ProjectFile = {
+      version: 1,
+      name: additions.name,
+      ...(environment !== undefined && { env: { default: environment.name, environments: { [environment.name]: environment.variables } } }),
+      ...(Object.keys(auth).length > 0 && { auth }),
+      run: ['tests/*.yaml'],
+    };
+    await mkdir(dirname(projectPath), { recursive: true });
+    await writeFile(projectPath, stringify(project, { lineWidth: 0 }), { flag: 'wx' });
+    return [`created ${PROJECT_FILE_NAME}`];
+  }
+
+  const project = await readProjectFile(projectPath);
+  const document = parseDocument(await readTextFile(projectPath));
+  const notes: string[] = [];
+  for (const [name, block] of Object.entries(auth)) {
+    if (project.auth?.[name] !== undefined) notes.push(`${PROJECT_FILE_NAME} already has auth "${name}"; it was not changed`);
+    else {
+      document.setIn(['auth', name], document.createNode(block));
+      notes.push(`added auth "${name}" to ${PROJECT_FILE_NAME}`);
+    }
+  }
+  if (environment !== undefined) {
+    if (project.env?.environments[environment.name] !== undefined) notes.push(`${PROJECT_FILE_NAME} already has environment "${environment.name}"; it was not changed`);
+    else {
+      document.setIn(['env', 'environments', environment.name], document.createNode(environment.variables));
+      notes.push(`added environment "${environment.name}" to ${PROJECT_FILE_NAME}`);
+    }
+  }
+  if (notes.some((note) => note.startsWith('added'))) await writeFile(projectPath, document.toString({ lineWidth: 0 }));
+  return notes;
+}
+
 /** Adds an auth block to httpi.yaml, keeping the rest of the file (comments included) as it is. */
 export async function addAuthBlock(projectPath: string, name: string, block: AuthConfig): Promise<void> {
   const project = await readProjectFile(projectPath);

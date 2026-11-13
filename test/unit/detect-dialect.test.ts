@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
-import { detectDialect, DIALECTS, type Dialect, tokenizeCurl } from '../../src/core/importer/detect-dialect.js';
+import { detectDialect, detectImportSource, DIALECTS, type Dialect, tokenizeCurl } from '../../src/core/importer/detect-dialect.js';
 
 const fixturesDir = new URL('../fixtures/curl/', import.meta.url);
 
@@ -40,5 +40,15 @@ describe('tokenizeCurl', () => {
     const text = "curl 'http://x' ^";
     expect(tokenizeCurl(text).dialect).toBe('cmd');
     expect(tokenizeCurl(text, 'bash')).toEqual({ dialect: 'bash', tokens: ['curl', 'http://x', '^'] });
+  });
+});
+
+describe('detectImportSource', () => {
+  test('a Postman collection is recognized by its schema; anything else is read as curl', () => {
+    const collection = readFileSync(new URL('../postman/shop.postman_collection.json', fixturesDir), 'utf8');
+    expect(detectImportSource(collection)).toBe('postman');
+    expect(detectImportSource("curl 'https://x.example' -d '{\"a\":1}'")).toBe('curl');
+    expect(detectImportSource('{"a":1}')).toBe('curl');
+    expect(detectImportSource('')).toBe('curl');
   });
 });

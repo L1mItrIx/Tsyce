@@ -2,7 +2,7 @@
 import { text } from 'node:stream/consumers';
 import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { basename, dirname, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { Command, InvalidArgumentError, Option } from 'commander';
 import { spawn } from 'node:child_process';
 import { loginWithBrowser } from './core/auth/login.js';
@@ -19,10 +19,11 @@ import {
   TestFileError,
   writeTestFile,
 } from './core/file.js';
-import { type Dialect, DIALECTS, tokenizeCurl } from './core/importer/detect-dialect.js';
+import { detectImportSource, type Dialect, DIALECTS, IMPORT_SOURCES, type ImportSource, tokenizeCurl } from './core/importer/detect-dialect.js';
+import { type ImportedProject, importPostman, importPostmanEnvironment } from './core/importer/postman.js';
 import { CurlImportError, extractSecrets, mapFlags } from './core/importer/map-flags.js';
 import { ShellSyntaxError } from './core/importer/tokenize-bash.js';
-import { addAuthBlock, expandRun, findProjectFile, initProject, PROJECT_FILE_NAME, projectEnvironment, readLocalValues, readProjectFile } from './core/project.js';
+import { addAuthBlock, expandRun, findProjectFile, initProject, mergeIntoProject, PROJECT_FILE_NAME, projectEnvironment, readLocalValues, readProjectFile } from './core/project.js';
 import { formatPretty, formatPrettyProject } from './core/reporter/pretty.js';
 import { formatJUnit, formatJUnitSuites } from './core/reporter/junit.js';
 import { readDataFile, readTestRows } from './core/data.js';
@@ -212,14 +213,9 @@ async function initCommand(directory: string): Promise<ExitCode> {
   return EXIT.ok;
 }
 
-type ImportOptions = { dialect?: Dialect; output?: string; name?: string; keepSecrets?: true };
+type ImportOptions = { from?: ImportSource; dialect?: Dialect; output?: string; name?: string; keepSecrets?: true; environment?: string };
 
-async function importCommand(curlFile: string | undefined, options: ImportOptions): Promise<ExitCode> {
-  if (curlFile === undefined && process.stdin.isTTY) {
-    say('Paste the curl command, then press Ctrl+D (on Windows: Ctrl+Z, then Enter).');
-  }
-  const pasted = curlFile === undefined ? await text(process.stdin) : await readTextFile(curlFile);
-
+async function importCurl(pasted: string, options: ImportOptions): Promise<ExitCode> {
   const { dialect, tokens } = tokenizeCurl(pasted, options.dialect);
   if (options.dialect === undefined) say(`httpi: read as a ${dialect} command (use --dialect to change it)`);
   const imported = mapFlags(tokens);
@@ -239,6 +235,58 @@ async function importCommand(curlFile: string | undefined, options: ImportOption
   }
   say('httpi: the test has no asserts yet; add an "expect" block (status, headers, json)');
   return EXIT.ok;
+}
+
+/** Writes a multi-file import as a project: tests under <dir>/tests and the rest in <dir>/httpi.yaml. */
+async function writeImportedProject(imported: ImportedProject, title: string, options: ImportOptions): Promise<ExitCode> {
+  if (options.output === undefined) {
+    throw new TestFileError('this import produces several files; pass the project directory with -o <directory>');
+  }
+  const testsDir = join(options.output, 'tests');
+  const targets = imported.files.map((entry) => ({ path: join(testsDir, entry.path), entry }));
+  const existing = targets.filter((target) => existsSync(target.path)).map((target) => target.path);
+  if (existing.length > 0) throw new TestFileError(`these files already exist; nothing was written: ${existing.join(', ')}`);
+
+  for (const warning of imported.warnings) say(`warning: ${warning}`);
+  await mkdir(testsDir, { recursive: true });
+  const moved = new Set<string>();
+  for (const { path, entry } of targets) {
+    // Literal credentials are replaced by variables, as when importing a curl command.
+    const prepared = options.keepSecrets ? null : prepareWizardFile(entry.file.tests);
+    const tests = prepared?.file.tests ?? entry.file.tests;
+    for (const secret of prepared?.secrets ?? []) moved.add(`${secret.header} → {{${secret.variable}}}`);
+    await writeTestFile(path, { ...entry.file, tests });
+    say(`created ${relative(options.output, path).replaceAll('\\', '/')} (${tests.length} ${tests.length === 1 ? 'test' : 'tests'})`);
+  }
+  for (const secret of moved) say(`secret: a literal credential was replaced by a variable (${secret}); give it a value with --var or in httpi.local.yaml`);
+
+  let environment: { name: string; variables: Record<string, string> } | undefined;
+  if (options.environment !== undefined) {
+    const extra = importPostmanEnvironment(await readTextFile(options.environment));
+    environment = { name: extra.name, variables: { ...imported.variables, ...extra.variables } };
+  } else if (Object.keys(imported.variables).length > 0) {
+    environment = { name: 'imported', variables: imported.variables };
+  }
+  for (const note of await mergeIntoProject(options.output, { name: title, auth: imported.auth, ...(environment !== undefined && { environment }) })) say(note);
+  say('httpi: the tests have no asserts yet; add "expect" blocks, then check the project with "httpi validate"');
+  return EXIT.ok;
+}
+
+async function importCommand(sourceFile: string | undefined, options: ImportOptions): Promise<ExitCode> {
+  if (sourceFile === undefined && process.stdin.isTTY) {
+    say('Paste the curl command or the collection, then press Ctrl+D (on Windows: Ctrl+Z, then Enter).');
+  }
+  const pasted = sourceFile === undefined ? await text(process.stdin) : await readTextFile(sourceFile);
+  const from = options.from ?? detectImportSource(pasted);
+  if (from === 'curl') {
+    if (options.environment !== undefined) throw new TestFileError('--environment only applies to a Postman collection');
+    return importCurl(pasted, options);
+  }
+  if (options.dialect !== undefined || options.name !== undefined) throw new TestFileError('--dialect and --name only apply to a curl command');
+  if (options.from === undefined) say(`httpi: read as a ${from} document (use --from to change it)`);
+  const imported = importPostman(pasted);
+  const title = (JSON.parse(pasted) as { info?: { name?: string } }).info?.name?.trim() || 'Imported API';
+  return writeImportedProject(imported, title, options);
 }
 
 type ExportOptions = VariableOptions & { dialect: Dialect };
@@ -359,13 +407,15 @@ auth
 
 program
   .command('import')
-  .description('turn a pasted curl command (Bash, cmd or PowerShell) into a test file')
-  .argument('[curl-file]', 'file with the curl command; without it the command is read from stdin')
-  .addOption(new Option('--dialect <shell>', 'shell the command was written for (default: detected)').choices(DIALECTS))
-  .option('-o, --output <file>', 'write the test file here instead of printing it')
-  .option('--name <name>', 'name of the test (default: method and path)')
-  .option('--keep-secrets', 'keep Authorization and Cookie values in the file instead of {{variables}}')
-  .action((curlFile: string | undefined, options: ImportOptions) => finish(importCommand(curlFile, options)));
+  .description('turn a pasted curl command (Bash, cmd or PowerShell) into a test file, or a Postman collection into a project')
+  .argument('[source-file]', 'file with the curl command or the collection; without it, read from stdin')
+  .addOption(new Option('--from <format>', 'what the source is (default: detected)').choices(IMPORT_SOURCES))
+  .addOption(new Option('--dialect <shell>', 'curl only: shell the command was written for (default: detected)').choices(DIALECTS))
+  .option('-o, --output <path>', 'curl: write the test file here instead of printing it; collection: project directory (tests go in <path>/tests)')
+  .option('--name <name>', 'curl only: name of the test (default: method and path)')
+  .option('--environment <file>', 'Postman only: environment export whose variables become an environment of httpi.yaml')
+  .option('--keep-secrets', 'keep Authorization and Cookie values in the files instead of {{variables}}')
+  .action((sourceFile: string | undefined, options: ImportOptions) => finish(importCommand(sourceFile, options)));
 
 program
   .command('export')

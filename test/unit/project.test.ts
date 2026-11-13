@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { TestFileError } from '../../src/core/file.js';
-import { addAuthBlock, expandRun, findProjectFile, projectEnvironment, readLocalValues, readProjectFile } from '../../src/core/project.js';
+import { addAuthBlock, expandRun, findProjectFile, mergeIntoProject, projectEnvironment, readLocalValues, readProjectFile } from '../../src/core/project.js';
 import { authSchema, projectFileSchema } from '../../src/core/schema.js';
 
 let root: string;
@@ -192,5 +192,38 @@ describe('addAuthBlock', () => {
     await expect(addAuthBlock(path(), 'main', block)).rejects.toThrow(/there is already an auth block named "main"/);
     expect(await readFile(path(), 'utf8')).toBe(before);
     await rm(path());
+  });
+});
+
+describe('mergeIntoProject', () => {
+  const dir = () => join(root, 'merged');
+  const block = authSchema.parse({ type: 'oauth2', flow: 'client_credentials', tokenUrl: 'https://id/token', clientId: 'ci', clientSecret: '${CLIENT_SECRET}' });
+  const environment = { name: 'staging', variables: { baseUrl: 'https://staging.example' } };
+
+  test('creates httpi.yaml when there is none, with the environment as default', async () => {
+    expect(await mergeIntoProject(dir(), { name: 'Shop API', auth: { main: block }, environment })).toEqual(['created httpi.yaml']);
+    expect(await readProjectFile(join(dir(), 'httpi.yaml'))).toEqual({
+      version: 1,
+      name: 'Shop API',
+      env: { default: 'staging', environments: { staging: { baseUrl: 'https://staging.example' } } },
+      auth: { main: block },
+      run: ['tests/*.yaml'],
+    });
+  });
+
+  test('adds only what an existing httpi.yaml does not have, and keeps its comments', async () => {
+    const path = join(dir(), 'httpi.yaml');
+    await writeFile(path, `# kept\n${await readFile(path, 'utf8')}`);
+    const notes = await mergeIntoProject(dir(), { name: 'ignored', auth: { main: block, admin: block }, environment: { name: 'prod', variables: { baseUrl: 'https://prod.example' } } });
+    expect(notes).toEqual(['httpi.yaml already has auth "main"; it was not changed', 'added auth "admin" to httpi.yaml', 'added environment "prod" to httpi.yaml']);
+    const project = await readProjectFile(path);
+    expect(project.name).toBe('Shop API');
+    expect(Object.keys(project.auth ?? {})).toEqual(['main', 'admin']);
+    expect(project.env).toEqual({ default: 'staging', environments: { staging: { baseUrl: 'https://staging.example' }, prod: { baseUrl: 'https://prod.example' } } });
+    expect(await readFile(path, 'utf8')).toMatch(/^# kept\n/);
+
+    const before = await readFile(path, 'utf8');
+    expect(await mergeIntoProject(dir(), { name: 'x', auth: {}, environment })).toEqual(['httpi.yaml already has environment "staging"; it was not changed']);
+    expect(await readFile(path, 'utf8')).toBe(before);
   });
 });

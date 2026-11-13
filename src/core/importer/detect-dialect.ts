@@ -1,3 +1,4 @@
+import { isPostmanCollection } from './postman.js';
 import { tokenizeBash } from './tokenize-bash.js';
 import { tokenizeCmd } from './tokenize-cmd.js';
 import { tokenizePowerShell } from './tokenize-powershell.js';
@@ -35,4 +36,19 @@ export function detectDialect(text: string): Dialect {
 export function tokenizeCurl(text: string, forced?: Dialect): { dialect: Dialect; tokens: string[] } {
   const dialect = forced ?? detectDialect(text);
   return { dialect, tokens: TOKENIZERS[dialect](text) };
+}
+
+export const IMPORT_SOURCES = ['curl', 'postman'] as const;
+
+export type ImportSource = (typeof IMPORT_SOURCES)[number];
+
+/** What kind of document was given to `httpi import`: a JSON collection, or else a curl command. */
+export function detectImportSource(text: string): ImportSource {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    return 'curl';
+  }
+  return isPostmanCollection(data) ? 'postman' : 'curl';
 }
