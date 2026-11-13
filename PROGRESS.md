@@ -184,6 +184,7 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-13 — V9.3: `node scripts/bench.mjs [--iterations N] [--json]` mide contra un servidor local. Resultado en el contenedor de desarrollo (Linux x64, Node 22.23, curl 8.5.0, 20 corridas, mediana): Node solo 25 ms; `httpi --help` 148 ms; curl 1 request 7 ms; `httpi run` 1 request con 2 asserts 195 ms; curl 10 requests 71 ms; `httpi run` 10 requests 300 ms. Es decir, ~120 ms de arranque (carga de módulos) y ~12 ms por request frente a ~7 ms de curl. No se midió en macOS ni Windows.
 - 2026-11-13 — V9.1: README con la sección "Un proyecto en un solo YAML" (init, run, validate, valores locales, capturas, datos, OAuth, rendimiento), importación Postman/OpenAPI y `--pick`, selector de archivos en el asistente, MCP sobre proyectos; se corrigieron las afirmaciones que ya no eran ciertas (solo captura de token, OAuth e importadores como faltantes). Ejemplo completo en `examples/proyecto/` (entorno, OAuth `client_credentials`, captura entre requests, CSV de 3 filas, JUnit); `examples/server.mjs` añade `/oauth/token` (cliente `demo-client`/`demo-secret`), `/admin/stats` y `GET /users/<id>`. El workflow de ejemplo también valida y ejecuta ese proyecto. Un e2e lo corre desde una copia temporal.
 - 2026-11-13 — CI en rojo en macOS y Windows desde V6.1 por tres fallos de tests (no del producto): (1) el error de un CSV ilegible en el asistente mostraba la ruta absoluta, que en esos sistemas es larga y la terminal de prueba la partía; ahora el asistente muestra la ruta tal como se eligió; (2) el fixture de Postman usaba `{{userName}}`, que en Windows resuelve con `USERNAME` del sistema (la colisión anotada en Bloqueos); se renombró a `{{newUser}}`; (3) una tecla llegaba antes de que Ink suscribiera la entrada; el test usa el clic con `act()` como los demás. Nota: los avisos de que el CI pasaba se basaban en Ubuntu; desde V5.4 no se revisó la matriz completa hasta V9.1.
+- 2026-11-13 — Los tests del selector de archivos esperaban un tiempo fijo y fallaban a veces en macOS/Windows (la carpeta aún no estaba leída o el selector aún no escuchaba). Ahora esperan la condición visible y vacían los efectos de Ink (`act`) antes de cada tecla; no se subieron tiempos límite.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.
@@ -199,6 +200,7 @@ Ideas que surgieron y no se hicieron. No implementar sin aprobación.
 - `httpi import --run`: ejecutar la request una vez y proponer `expect.status` con el status real.
 - `httpi import --force` para sobrescribir el archivo de salida.
 - Reducir el arranque (~120 ms sobre Node): cargar con `import()` diferido los módulos de importadores, OAuth y MCP, que `httpi run` no usa.
+- Test inestable conocido (anterior a v0.2): `suite-wizard.test.tsx` "two requests can be created, saved and rerun…" excedió los 5 s una vez en macOS (corrida de V5.3) y pasó en las siguientes. Revisar si espera tiempos fijos.
 
 ## Bloqueos
 Qué impide avanzar y qué se necesita del usuario.

@@ -28,6 +28,12 @@ afterEach(async () => {
 });
 const tick = () => new Promise((resolve) => setTimeout(resolve, 60));
 
+/** Flushes Ink's effects first, so the key reaches an input handler that is already listening. */
+async function press(app: ReturnType<typeof render>, value: string): Promise<void> {
+  await act(async () => {});
+  await act(async () => { app.stdin.write(value); });
+}
+
 async function toBody(app: ReturnType<typeof render>, url: string) {
   await tick();
   await clickLabel(app, 'POST'); await clickLabel(app, '[ Next ]');
@@ -40,9 +46,10 @@ test('Attach a file opens the picker in the YAML folder and sends the file as mu
   const app = render(<MouseProvider><RequestWizard baseDir={root} onComplete={complete} onCancel={vi.fn()} /></MouseProvider>);
   await toBody(app, 'https://api.example/upload');
   await clickLabel(app, '[ Attach a file ]');
-  await tick();
+  await vi.waitFor(() => expect(app.lastFrame()).toContain('uploads/'));
   expect(app.lastFrame()).toContain('Choose the file to upload');
-  await clickLabel(app, 'uploads/'); await tick();
+  await clickLabel(app, 'uploads/');
+  await vi.waitFor(() => expect(app.lastFrame()).toContain('avatar.png'));
   await clickLabel(app, 'avatar.png'); await tick();
   expect(app.lastFrame()).toContain('Body: multipart form (file=@uploads/avatar.png)');
   await clickLabel(app, '[ Send request ]');
@@ -52,10 +59,10 @@ test('Attach a file opens the picker in the YAML folder and sends the file as mu
 test('Ctrl+O opens the picker from the body step and Escape returns to it', async () => {
   const app = render(<MouseProvider><RequestWizard baseDir={root} onComplete={vi.fn()} onCancel={vi.fn()} /></MouseProvider>);
   await toBody(app, 'https://api.example/upload');
-  app.stdin.write('\u000F'); await tick();
-  expect(app.lastFrame()).toContain('Choose the file to upload');
-  app.stdin.write('\u001B'); await tick();
-  expect(app.lastFrame()).toContain('Body (literal text; empty for none)');
+  await press(app, '\u000F');
+  await vi.waitFor(() => expect(app.lastFrame()).toContain('uploads/'));
+  await press(app, '\u001B');
+  await vi.waitFor(() => expect(app.lastFrame()).toContain('Body (literal text; empty for none)'));
 });
 
 const ok = (status = 200): RunResult => ({ status, timeMs: 1, headers: { 'content-type': ['application/json'] }, body: '{"ok":true}', curlExitCode: 0, error: null });
@@ -68,10 +75,12 @@ test('a data file chosen at the review fills {{data.*}} with its first row for t
   await clickLabel(app, '[ Next ]');
   app.stdin.write('https://api.example/users/{{data.name}}'); await tick();
   await clickLabel(app, '[ Next ]'); await clickLabel(app, '[ Skip headers ]'); await clickLabel(app, '[ No body ]');
-  app.stdin.write('d'); await tick();
+  await press(app, 'd');
+  await vi.waitFor(() => expect(app.lastFrame()).toContain('data/'));
   expect(app.lastFrame()).toContain('Choose a CSV or JSON data file');
   expect(app.lastFrame()).not.toContain('uploads/avatar.png');
-  await clickLabel(app, 'data/'); await tick();
+  await clickLabel(app, 'data/');
+  await vi.waitFor(() => expect(app.lastFrame()).toContain('users.csv'));
   await clickLabel(app, 'users.csv'); await tick();
   expect(app.lastFrame()).toContain('Data: data/users.csv (runs once per row; the first row is used now)');
   await clickLabel(app, '[ Send request ]');
@@ -93,8 +102,10 @@ test('a data file that cannot be read is shown as an error to fix, not a crash',
   await clickLabel(app, '[ Next ]');
   app.stdin.write('https://api.example/{{data.name}}'); await tick();
   await clickLabel(app, '[ Next ]'); await clickLabel(app, '[ Skip headers ]'); await clickLabel(app, '[ No body ]');
-  app.stdin.write('d'); await tick();
-  await clickLabel(app, 'data/'); await tick();
+  await press(app, 'd');
+  await vi.waitFor(() => expect(app.lastFrame()).toContain('data/'));
+  await clickLabel(app, 'data/');
+  await vi.waitFor(() => expect(app.lastFrame()).toContain('broken.csv'));
   await clickLabel(app, 'broken.csv'); await tick();
   await clickLabel(app, '[ Send request ]');
   await vi.waitFor(() => expect(app.lastFrame()).toContain('data/broken.csv:2: a quoted field is never closed'));
