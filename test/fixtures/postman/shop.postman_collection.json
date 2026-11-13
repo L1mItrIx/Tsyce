@@ -32,7 +32,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "body": { "mode": "raw", "raw": "{\n  \"name\": \"{{userName}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"{{newUser}}\"\n}", "options": { "raw": { "language": "json" } } },
             "url": { "raw": "{{baseUrl}}/users" }
           }
         },

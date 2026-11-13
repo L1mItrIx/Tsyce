@@ -78,9 +78,9 @@ test('a data file chosen at the review fills {{data.*}} with its first row for t
   await vi.waitFor(() => expect(send).toHaveBeenCalledOnce());
   expect(send.mock.calls[0]![0]).toMatchObject({ url: 'https://api.example/users/Ana' });
   await vi.waitFor(() => expect(app.lastFrame()).toContain('Add request'));
-  app.stdin.write('\r'); await tick();
+  await clickLabel(app, '[ Add request ]');
   await vi.waitFor(() => expect(app.lastFrame()).toContain('1 request ready'));
-  app.stdin.write('\r'); await tick();
+  await clickLabel(app, '[ Save file ]');
   await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
   expect(complete.mock.calls[0]![0][0]).toMatchObject({ request: { url: 'https://api.example/users/{{data.name}}' }, data: 'data/users.csv' });
 });
@@ -97,7 +97,8 @@ test('a data file that cannot be read is shown as an error to fix, not a crash',
   await clickLabel(app, 'data/'); await tick();
   await clickLabel(app, 'broken.csv'); await tick();
   await clickLabel(app, '[ Send request ]');
-  await vi.waitFor(() => expect(app.lastFrame()).toContain('a quoted field is never closed'));
+  await vi.waitFor(() => expect(app.lastFrame()).toContain('data/broken.csv:2: a quoted field is never closed'));
+  expect(app.lastFrame()).not.toContain(root);
   expect(send).not.toHaveBeenCalled();
   expect(failed).not.toHaveBeenCalled();
 });

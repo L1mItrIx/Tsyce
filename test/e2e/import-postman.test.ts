@@ -72,12 +72,12 @@ test('the imported project validates once its variables have values, and its req
   const project = join(dir, 'shop');
   expect((await httpi(['import', COLLECTION, '-o', project])).code).toBe(0);
 
-  const missing = await httpi(['validate'], { cwd: project, env: { token: undefined, userName: undefined, basicAuth: undefined, id: undefined, customerId: undefined, apiKey: undefined } });
+  const missing = await httpi(['validate'], { cwd: project, env: { token: undefined, newUser: undefined, basicAuth: undefined, id: undefined, customerId: undefined, apiKey: undefined } });
   expect(missing.stdout).toContain('tests/orders-payments.yaml: test "Upload receipt": multipart file tests/receipts/r1.pdf does not exist\n');
-  expect(missing.stdout).toContain('httpi.yaml: unresolved variables: {{customerId}}, {{apiKey}}, {{token}}, {{userName}}, {{id}}, {{basicAuth}}\n');
+  expect(missing.stdout).toContain('httpi.yaml: unresolved variables: {{customerId}}, {{apiKey}}, {{token}}, {{newUser}}, {{id}}, {{basicAuth}}\n');
   expect(missing.code).toBe(2);
 
-  await writeFile(join(project, 'httpi.local.yaml'), `baseUrl: ${baseUrl}\ntoken: t\nuserName: Ana\nbasicAuth: x\nid: 7\n`);
+  await writeFile(join(project, 'httpi.local.yaml'), `baseUrl: ${baseUrl}\ntoken: t\nnewUser: Ana\nbasicAuth: x\nid: 7\n`);
   await rm(join(project, 'tests', 'orders-payments.yaml'));
   const run = await httpi(['run'], { cwd: project });
   expect(calls).toEqual(['GET /health', 'GET /users?page=1&limit=20', 'POST /users', 'DELETE /users/7?force=true', 'GET /users/7']);

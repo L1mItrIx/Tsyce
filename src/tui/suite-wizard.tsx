@@ -41,7 +41,12 @@ export function SuiteWizard({ sendRequest, onComplete, onCancel, baseDir = proce
       let resolved: typeof request;
       try {
         // The live request uses the first row; the saved test will run every row.
-        const row = data === undefined ? undefined : (await readDataFile(resolve(baseDir, data)))[0];
+        let row: Record<string, string> | undefined;
+        if (data !== undefined) {
+          const path = resolve(baseDir, data);
+          // Name the file as the person chose it, not by its absolute path.
+          row = (await readDataFile(path).catch((cause: Error) => { throw new TestFileError(cause.message.replaceAll(path, data)); }))[0];
+        }
         resolved = resolveVars(request, { cli: {}, system: process.env, file: {}, runtime: { authToken: token ?? undefined }, ...(row !== undefined && { data: row }) });
       } catch (cause) {
         if (!(cause instanceof TestFileError || cause instanceof UnresolvedVariableError)) throw cause;

@@ -28,7 +28,7 @@ describe('importPostman: the Shop API fixture', () => {
         method: 'POST',
         url: '{{baseUrl}}/users',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer {{token}}' },
-        body: { text: '{\n  "name": "{{userName}}"\n}' },
+        body: { text: '{\n  "name": "{{newUser}}"\n}' },
       },
       { method: 'DELETE', url: '{{baseUrl}}/users/{{id}}?force=true', headers: { Authorization: `Basic ${Buffer.from('admin:FAKE_PASSWORD').toString('base64')}` } },
       { ...GET, url: '{{baseUrl}}/users/7', headers: { Authorization: `Basic ${Buffer.from('admin:FAKE_PASSWORD').toString('base64')}` } },
