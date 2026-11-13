@@ -20,6 +20,7 @@ import {
   writeTestFile,
 } from './core/file.js';
 import { detectImportSource, type Dialect, DIALECTS, IMPORT_SOURCES, type ImportSource, tokenizeCurl } from './core/importer/detect-dialect.js';
+import { importOpenApi } from './core/importer/openapi.js';
 import { type ImportedProject, importPostman, importPostmanEnvironment } from './core/importer/postman.js';
 import { CurlImportError, extractSecrets, mapFlags } from './core/importer/map-flags.js';
 import { ShellSyntaxError } from './core/importer/tokenize-bash.js';
@@ -268,7 +269,8 @@ async function writeImportedProject(imported: ImportedProject, title: string, op
     environment = { name: 'imported', variables: imported.variables };
   }
   for (const note of await mergeIntoProject(options.output, { name: title, auth: imported.auth, ...(environment !== undefined && { environment }) })) say(note);
-  say('httpi: the tests have no asserts yet; add "expect" blocks, then check the project with "httpi validate"');
+  const bare = imported.files.flatMap((entry) => entry.file.tests).filter((test) => Object.keys(test.expect).length === 0).length;
+  say(`httpi: ${bare === 0 ? 'each test only checks the status' : `${bare} ${bare === 1 ? 'test has' : 'tests have'} no asserts yet`}; add "expect" blocks, then check the project with "httpi validate"`);
   return EXIT.ok;
 }
 
@@ -283,7 +285,12 @@ async function importCommand(sourceFile: string | undefined, options: ImportOpti
     return importCurl(pasted, options);
   }
   if (options.dialect !== undefined || options.name !== undefined) throw new TestFileError('--dialect and --name only apply to a curl command');
-  if (options.from === undefined) say(`httpi: read as a ${from} document (use --from to change it)`);
+  if (options.from === undefined) say(`httpi: read as ${from === 'openapi' ? 'an OpenAPI document' : 'a Postman collection'} (use --from to change it)`);
+  if (from === 'openapi') {
+    if (options.environment !== undefined) throw new TestFileError('--environment only applies to a Postman collection');
+    const imported = importOpenApi(pasted);
+    return writeImportedProject(imported, imported.title, options);
+  }
   const imported = importPostman(pasted);
   const title = (JSON.parse(pasted) as { info?: { name?: string } }).info?.name?.trim() || 'Imported API';
   return writeImportedProject(imported, title, options);
@@ -407,11 +414,11 @@ auth
 
 program
   .command('import')
-  .description('turn a pasted curl command (Bash, cmd or PowerShell) into a test file, or a Postman collection into a project')
-  .argument('[source-file]', 'file with the curl command or the collection; without it, read from stdin')
+  .description('turn a pasted curl command (Bash, cmd or PowerShell) into a test file, or a Postman collection or OpenAPI 3 document into a project')
+  .argument('[source-file]', 'file with the curl command, the collection or the OpenAPI document; without it, read from stdin')
   .addOption(new Option('--from <format>', 'what the source is (default: detected)').choices(IMPORT_SOURCES))
   .addOption(new Option('--dialect <shell>', 'curl only: shell the command was written for (default: detected)').choices(DIALECTS))
-  .option('-o, --output <path>', 'curl: write the test file here instead of printing it; collection: project directory (tests go in <path>/tests)')
+  .option('-o, --output <path>', 'curl: write the test file here instead of printing it; Postman/OpenAPI: project directory (tests go in <path>/tests)')
   .option('--name <name>', 'curl only: name of the test (default: method and path)')
   .option('--environment <file>', 'Postman only: environment export whose variables become an environment of httpi.yaml')
   .option('--keep-secrets', 'keep Authorization and Cookie values in the files instead of {{variables}}')

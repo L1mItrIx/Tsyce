@@ -39,7 +39,7 @@ test('a Postman collection becomes a project: tests per folder, httpi.yaml with 
   const result = await httpi(['import', COLLECTION, '-o', project, '--environment', fixture('staging.postman_environment.json')]);
   expect(result.stdout).toBe('');
   expect(result.stderr.split('\n')).toEqual([
-    'httpi: read as a postman document (use --from to change it)',
+    'httpi: read as a Postman collection (use --from to change it)',
     'warning: Shop API: the collection-level pre-request script was not converted',
     'warning: Users / List users: the test script was not converted',
     'warning: Users / Admin / Delete user: path variable ":id" has no value; it became {{id}}',
@@ -52,7 +52,7 @@ test('a Postman collection becomes a project: tests per folder, httpi.yaml with 
     'created tests/orders-payments.yaml (5 tests)',
     'secret: a literal credential was replaced by a variable (Authorization → {{basicAuth}}); give it a value with --var or in httpi.local.yaml',
     'created httpi.yaml',
-    'httpi: the tests have no asserts yet; add "expect" blocks, then check the project with "httpi validate"',
+    'httpi: 10 tests have no asserts yet; add "expect" blocks, then check the project with "httpi validate"',
     '',
   ]);
   expect(result.code).toBe(0);
@@ -95,7 +95,7 @@ test('importing into an existing project adds to httpi.yaml without replacing it
   expect(yaml).toContain('baseUrl: https://api.shop.example\n');
 
   const again = await httpi(['import', COLLECTION, '-o', project]);
-  expect(again.stderr).toMatch(/^httpi: read as a postman document.*\nhttpi: these files already exist; nothing was written: .*shop-api\.yaml, .*users\.yaml, .*orders-payments\.yaml\n$/);
+  expect(again.stderr).toMatch(/^httpi: read as a Postman collection.*\nhttpi: these files already exist; nothing was written: .*shop-api\.yaml, .*users\.yaml, .*orders-payments\.yaml\n$/);
   expect(again.code).toBe(2);
   expect(await readFile(join(project, 'httpi.yaml'), 'utf8')).toBe(yaml);
 });

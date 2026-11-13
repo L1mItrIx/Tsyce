@@ -1,3 +1,4 @@
+import { isOpenApiDocument, parseOpenApiSource } from './openapi.js';
 import { isPostmanCollection } from './postman.js';
 import { tokenizeBash } from './tokenize-bash.js';
 import { tokenizeCmd } from './tokenize-cmd.js';
@@ -38,17 +39,14 @@ export function tokenizeCurl(text: string, forced?: Dialect): { dialect: Dialect
   return { dialect, tokens: TOKENIZERS[dialect](text) };
 }
 
-export const IMPORT_SOURCES = ['curl', 'postman'] as const;
+export const IMPORT_SOURCES = ['curl', 'postman', 'openapi'] as const;
 
 export type ImportSource = (typeof IMPORT_SOURCES)[number];
 
-/** What kind of document was given to `httpi import`: a JSON collection, or else a curl command. */
+/** What kind of document was given to `httpi import`: a Postman collection, an OpenAPI document, or else a curl command. */
 export function detectImportSource(text: string): ImportSource {
-  let data: unknown;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    return 'curl';
-  }
-  return isPostmanCollection(data) ? 'postman' : 'curl';
+  // Both formats are YAML or JSON objects; a curl command never parses to one with these keys.
+  const data = parseOpenApiSource(text);
+  if (isPostmanCollection(data)) return 'postman';
+  return isOpenApiDocument(data) ? 'openapi' : 'curl';
 }
