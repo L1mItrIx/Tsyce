@@ -102,7 +102,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 
 ### V8 — Selector de archivos
 - [x] V8.1 Estado puro del selector con tests
-- [ ] V8.2 Componente Ink (teclado y mouse)
+- [x] V8.2 Componente Ink (teclado y mouse)
 - [ ] V8.3 Integración en multipart, datos e importación
 
 ### V9 — Cierre
@@ -178,6 +178,7 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-13 — V6.2: `httpi import` detecta el origen (colección Postman por su esquema; si no, curl) o se fuerza con `--from curl|postman`. Una colección necesita `-o <directorio>`: los tests van a `<directorio>/tests/` y el resto a `<directorio>/httpi.yaml`, que se crea si no existe o se completa sin reemplazar nada (bloques `auth` y entorno nuevos; lo que ya existe se deja y se avisa). Las variables de la colección forman el entorno `imported`; con `--environment <export de Postman>` el entorno toma su nombre y sus valores. No pisa tests existentes (salida 2 sin escribir nada). Las credenciales literales se sustituyen por variables salvo `--keep-secrets`; sus valores no se guardan en ningún archivo. `--dialect` y `--name` son solo para curl.
 - 2026-11-13 — V7.1 y V7.2 se entregan en un solo commit (excepción a "un commit por tarea"): operaciones, `$ref`, ejemplos y seguridad son un mismo recorrido del documento. `httpi import --from openapi` (o detectado) acepta OpenAPI 3.0/3.1 en YAML o JSON: un test por operación, un archivo por primer tag (sin tag → el título de la API), `baseUrl` desde el primer `servers` con los valores por defecto de sus variables, `expect.status` = primer 2xx documentado. Parámetros: los de ruta y los requeridos de query/header toman el ejemplo o valor por defecto del documento, o quedan como `{{nombre}}`; los opcionales no se incluyen. Body: ejemplo del media type, o armado desde el esquema (`example`, `default`, `enum`, `allOf`, sin `readOnly`; si no hay ejemplos queda un esqueleto con valores de relleno). Seguridad: bearer, basic y apiKey (header o query) pasan a variables; oauth2 `clientCredentials`/`authorizationCode` a bloques `auth` con `${CLIENT_ID}`/`${CLIENT_SECRET}`. Avisan: Swagger 2 (error), `$ref` remotos, `oneOf`/`anyOf` sin ejemplo, bodies XML/binarios, flujo implicit/password, openIdConnect, cookies. Fixtures reales descargados de OAI (`petstore-expanded.yaml`) y de swagger-api/swagger-petstore (`petstore3.yaml`), ambos Apache 2.0.
 - 2026-11-13 — V8.1: `tui/file-picker-state.ts` es el estado puro del selector (sin leer disco): `..` primero salvo en la raíz, luego carpetas y archivos ordenados sin distinguir mayúsculas; los ocultos (`.x`) no se muestran; un filtro de extensiones limita solo los archivos. Una carpeta que no se puede leer muestra el error y deja volver arriba. `pathForYaml` escribe la ruta elegida relativa al YAML con `/`.
+- 2026-11-13 — V8.2: `tui/file-picker.tsx` lee la carpeta con `fs.readdir` y muestra una ventana de 10 entradas. Teclado: ↑/↓, RePág/AvPág, Enter o → abre, ← o Retroceso sube, Esc cancela. Mouse: clic abre la entrada, rueda desplaza.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.
