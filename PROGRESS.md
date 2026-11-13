@@ -108,7 +108,7 @@ Marcas: `[ ]` pendiente · `[~]` en curso (con rama) · `[x]` hecha (con commit)
 ### V9 — Cierre
 - [ ] V9.1 README y ejemplo completo en `examples/`
 - [x] V9.2 MCP sobre el proyecto
-- [ ] V9.3 Medir tiempo de arranque y sobrecosto frente a curl directo
+- [x] V9.3 Medir tiempo de arranque y sobrecosto frente a curl directo
 
 ## Decisiones
 Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
@@ -181,6 +181,7 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 - 2026-11-13 — V8.2: `tui/file-picker.tsx` lee la carpeta con `fs.readdir` y muestra una ventana de 10 entradas. Teclado: ↑/↓, RePág/AvPág, Enter o → abre, ← o Retroceso sube, Esc cancela. Mouse: clic abre la entrada, rueda desplaza.
 - 2026-11-13 — V8.3: en `httpi new`, el paso Body tiene `[ Attach a file ]` (o Ctrl+O): el archivo se envía como campo multipart `file` y la ruta se guarda relativa al YAML (también para el envío en vivo). En la confirmación, `[ Repeat over a data file ]` (o `d`) elige un CSV/JSON: el envío en vivo usa la primera fila y el test se guarda con `data`. Un archivo de datos ilegible o una variable sin valor se muestran como error corregible en vez de cerrar el asistente (antes una variable sin resolver lo cerraba). `httpi import --pick` abre el selector para elegir el archivo a importar (requiere TTY; no se combina con un archivo). Verificado `import --pick` en un pseudo-terminal real; el asistente con archivos solo con `ink-testing-library`.
 - 2026-11-13 — Orden de V9: se hace V9.2 y V9.3 antes que V9.1 para que el README documente lo terminado. V9.2: `run_test` con `file: httpi.yaml` ejecuta el proyecto entero (capturas compartidas, filas de datos, tokens OAuth). Antes de enviar nada se comprueba cada request planificada (fila por fila) y cada endpoint de tokens: origen aprobado, sin redirects, sin multipart, sin capturas en la URL, tope de 30 s; el entorno efectivo (el pedido o `env.default`) debe estar en `--allow-env`; los archivos de `run:`, de datos y `httpi.local.yaml` deben estar dentro del root. `list_tests` devuelve también `projects`; `inspect_test` sobre `httpi.yaml` muestra archivos, entornos y bloques `auth` (solo nombre y flujo). `httpi.local.yaml` no se puede leer por MCP. Un archivo suelto con `data` ya se puede ejecutar; uno con `auth` solo dentro de su proyecto. Los resultados siguen sin cuerpos, headers ni valores. La preparación de una corrida de proyecto (`loadProjectRun`) y la lista de requests planificadas (`plannedRequests`) ahora se comparten entre CLI y MCP.
+- 2026-11-13 — V9.3: `node scripts/bench.mjs [--iterations N] [--json]` mide contra un servidor local. Resultado en el contenedor de desarrollo (Linux x64, Node 22.23, curl 8.5.0, 20 corridas, mediana): Node solo 25 ms; `httpi --help` 148 ms; curl 1 request 7 ms; `httpi run` 1 request con 2 asserts 195 ms; curl 10 requests 71 ms; `httpi run` 10 requests 300 ms. Es decir, ~120 ms de arranque (carga de módulos) y ~12 ms por request frente a ~7 ms de curl. No se midió en macOS ni Windows.
 
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.
@@ -195,6 +196,7 @@ Ideas que surgieron y no se hicieron. No implementar sin aprobación.
 - Tratar como secretos otros headers habituales (`X-Api-Key`, `Proxy-Authorization`) y parámetros de la URL (`?api_key=`).
 - `httpi import --run`: ejecutar la request una vez y proponer `expect.status` con el status real.
 - `httpi import --force` para sobrescribir el archivo de salida.
+- Reducir el arranque (~120 ms sobre Node): cargar con `import()` diferido los módulos de importadores, OAuth y MCP, que `httpi run` no usa.
 
 ## Bloqueos
 Qué impide avanzar y qué se necesita del usuario.
