@@ -25,8 +25,15 @@ jobs:
             sleep 0.1
           done
           node dist/cli.js run examples/users.yaml --env dev --reporter junit > results.xml
+          # The whole project in one command; it also writes examples/proyecto/reports/junit.xml.
+          (cd examples/proyecto && node ../../dist/cli.js validate && node ../../dist/cli.js run)
+        env:
+          # In your repository, read it from the repository secrets: ${{ secrets.DEMO_CLIENT_SECRET }}
+          DEMO_CLIENT_SECRET: demo-secret
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: api-test-results
-          path: results.xml
+          path: |
+            results.xml
+            examples/proyecto/reports/junit.xml

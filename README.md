@@ -2,6 +2,7 @@
 
 Pega un curl o responde unas preguntas y obtén una prueba de API lista para CI.
 httpi usa el curl de tu sistema: el asistente y el runner ejecutan la misma request.
+Un `httpi.yaml` reúne entornos, autenticación, datos y qué ejecutar: en CI basta `httpi run`.
 
 ![Asistente de httpi en una terminal real](https://raw.githubusercontent.com/L1mItrIx/Tsyce/claude/bold-albattani-fsyz04/docs/demo.gif)
 
@@ -42,6 +43,115 @@ npm publish --access public
 ```
 
 La versión preparada es **0.1.0**. No hay publicación automática configurada.
+
+## Un proyecto en un solo YAML
+
+```bash
+httpi init mi-api        # httpi.yaml, tests/, data/, workflow de CI y .gitignore
+cd mi-api
+httpi validate           # revisa todo sin enviar requests (útil en pull requests)
+httpi run                # ejecuta el proyecto del httpi.yaml más cercano
+```
+
+El workflow que crea `httpi init` ejecuta `npx --yes httpi-cli run`: funcionará cuando
+el paquete esté publicado en npm; mientras tanto, instala httpi desde el código fuente.
+
+[examples/proyecto](examples/proyecto) es un proyecto completo listo para la API de
+ejemplo: inicia `node examples/server.mjs` y ejecuta
+`DEMO_CLIENT_SECRET=demo-secret httpi run` dentro de esa carpeta.
+
+```yaml
+version: 1
+name: API de ejemplo
+env:
+  default: local                  # el que se usa sin --env
+  environments:
+    local: { baseUrl: "http://127.0.0.1:3000" }
+    staging: { baseUrl: "https://staging.example.com" }
+auth:
+  demo:                           # los tests lo usan con `auth: demo`
+    type: oauth2
+    flow: client_credentials
+    tokenUrl: "{{baseUrl}}/oauth/token"
+    clientId: demo-client
+    clientSecret: ${DEMO_CLIENT_SECRET}   # secretos siempre desde el entorno
+run:
+  - tests/salud.yaml
+  - file: tests/usuarios.yaml     # se repite una vez por fila del CSV
+    data: data/usuarios.csv
+  - tests/admin/*.yaml            # patrón: archivos en orden alfabético
+report:
+  junit: reports/junit.xml        # se escribe en cada corrida, también si falla
+```
+
+- **Un solo flujo.** Los archivos corren en el orden de `run:`. Lo que un test captura
+  sirve a los siguientes, también en otros archivos. Si una captura o un login falla,
+  el resto no se ejecuta y el reporte lo marca como *not run*. Antes de enviar nada se
+  comprueban todas las variables, filas de datos y nombres de `auth`.
+- **`httpi run <archivo>`** sigue ejecutando un archivo suelto, sin leer `httpi.yaml`.
+- **Valores personales.** `httpi.local.yaml` (fuera de git, lo añade `httpi init`) guarda
+  `nombre: valor` para tu máquina. En un proyecto, `{{nombre}}` busca en
+  `--var` > entorno del sistema > `httpi.local.yaml` > entorno de `httpi.yaml`.
+- **`httpi validate`** lista todos los problemas a la vez y sale con 0 o 2: esquema,
+  archivos de datos y de multipart inexistentes, credenciales literales en
+  `Authorization`/`Cookie` (sin mostrar su valor) y variables sin valor. Las referencias
+  `${NOMBRE}` no se reportan: se espera que el CI las defina como secretos.
+
+### Capturas
+
+```yaml
+tests:
+  - name: Crear usuario
+    request: { method: POST, url: "{{baseUrl}}/users", body: { json: { name: Ana } } }
+    expect: { status: 201 }
+    capture:
+      userId: $.id              # cualquier texto, número o booleano de la respuesta
+  - name: Consultar usuario
+    request: { url: "{{baseUrl}}/users/{{userId}}" }
+```
+
+Cada ruta debe seleccionar exactamente un valor. Un nombre capturado no toma valores
+antiguos de `--var` ni del sistema. `authToken` es especial: oculta la respuesta del
+login y redacta el token en los reportes.
+
+### Datos desde CSV o JSON
+
+`data` en un test (ruta relativa al test) lo repite por fila con el sufijo `[row N]`;
+`data` en una entrada de `run:` (relativa a `httpi.yaml`) repite el archivo completo.
+Las columnas se usan como `{{data.columna}}`. El CSV lleva cabecera y admite comillas,
+comas y saltos de línea dentro de comillas; el JSON es una lista de objetos planos.
+Una fila que falla no detiene las demás. Las rutas `@archivo` de un body multipart
+también son relativas al YAML que las declara.
+
+### OAuth 2.0
+
+| Flujo | Para | Cómo |
+|---|---|---|
+| `client_credentials` | CI | httpi pide el token al empezar la corrida. HTTP Basic por defecto; `clientAuth: body` lo manda en el formulario. |
+| `refresh_token` | CI en nombre de una persona | Canjea `refreshToken: ${VARIABLE}` al empezar. Sin `clientSecret` es un cliente público. |
+| `authorization_code` + PKCE | Tu máquina | `httpi auth login <nombre>` abre el navegador y recibe el código en `http://127.0.0.1:8787/callback` (cambia el puerto con `redirectPort`). |
+
+```bash
+httpi auth add               # asistente: escribe el bloque en httpi.yaml (solo nombres de variables)
+httpi auth login demo        # solo authorization_code
+httpi auth status            # estado de cada bloque, sin mostrar tokens
+```
+
+El login guarda el token en `.httpi/tokens.json` junto a `httpi.yaml` (permisos 600
+donde el sistema los admite; en Windows queda en tu carpeta de usuario sin ese
+permiso). `httpi run` lo renueva con su refresh token cuando caduca. Si no hay sesión
+o el proveedor rechaza la petición, la corrida no empieza y sale con 3. Los tokens
+se redactan en los reportes y nunca se escriben en el YAML. No incluye device code,
+JWT bearer ni mTLS. `auth` solo funciona dentro de un proyecto.
+
+### Rendimiento
+
+`node scripts/bench.mjs` mide contra un servidor local. En el contenedor Linux de
+desarrollo (Node 22, curl 8.5, mediana de 20 corridas): `httpi --help` tarda 148 ms
+(Node solo, 25 ms); una request con 2 asserts, 195 ms frente a 7 ms de `curl`;
+10 requests en un archivo, 300 ms frente a 71 ms de 10 llamadas a `curl`. El coste
+está sobre todo en el arranque (~120 ms) y luego ~12 ms por request. No se ha medido
+en macOS ni en Windows.
 
 ## Crear una prueba con el asistente
 
@@ -99,6 +209,12 @@ El formulario incluye **Add JSON header** y **Use JSON example**; este último a
 `Content-Type: application/json` si no lo habías definido. El ejemplo es editable:
 debes adaptarlo a los campos que espera tu API.
 
+**Attach a file** (o Ctrl+O en Body) abre un explorador de archivos: el archivo elegido
+se envía como campo multipart `file` y se guarda con una ruta relativa al YAML. En la
+confirmación, **Repeat over a data file** (o `d`) elige un CSV o JSON: la request en
+vivo usa la primera fila y el test guardado se repite por cada fila. El explorador
+funciona con flechas, Enter, ← para subir de carpeta, Esc para cancelar y con el mouse.
+
 En un flujo, el mismo secreto reutiliza su variable; credenciales diferentes usan
 variables distintas (`{{token}}`, `{{token2}}`, etc.). httpi indica los nombres al
 guardar, sin imprimir los valores. Proporciónalos con `--var` al ejecutar el archivo.
@@ -141,7 +257,8 @@ del asistente evitan asserts con el valor literal del token. Para credenciales r
 usa variables de entorno en el login y revisa el archivo antes de compartirlo: los
 campos de usuario/password del body no se extraen automáticamente como secretos.
 
-La captura actual está orientada a tokens Bearer en una respuesta JSON. El exportador
+El asistente captura tokens Bearer de una respuesta JSON; para capturar otros valores
+escribe `capture: { nombre: <JSONPath> }` en el YAML (ver *Capturas*). El exportador
 de curl estático rechaza estos flujos, porque no puede reproducir la extracción.
 
 ## Conectar agentes de IA por MCP
@@ -179,10 +296,10 @@ copia sin cambios a configuraciones TOML. No se ha instalado automáticamente en
 
 | Herramienta | Entrada | Resultado |
 |---|---|---|
-| `list_tests` | `{}` | Rutas relativas de flujos YAML/JSON válidos; excluye archivos de entorno. |
-| `inspect_test` | `{ "file": "auth.yaml" }` | Orden, método, URL sin query/credenciales, nombres de headers, tipo de body y cantidad de asserts; omite valores de headers/body/asserts. |
+| `list_tests` | `{}` | Rutas relativas de flujos YAML/JSON válidos y de los proyectos `httpi.yaml`; excluye archivos de entorno y de valores locales. |
+| `inspect_test` | `{ "file": "auth.yaml" }` | Orden, método, URL sin query/credenciales, nombres de headers, tipo de body y cantidad de asserts; omite valores de headers/body/asserts. Con `httpi.yaml`: archivos que ejecuta, entornos y nombre/flujo de cada bloque `auth`. |
 | `create_test` | `{ "file": "nuevo.yaml", "testFile": { "version": 1, "tests": [...] } }` | Valida y crea el archivo, sin sobrescribir ni ejecutarlo. Extrae Authorization/Cookie a variables como el asistente. |
-| `run_test` | `{ "file": "auth.yaml", "env": "dev", "variables": {} }` | `exitCode`, resumen, orden, status HTTP, tiempo y resultado booleano de cada assert. Autentica y captura tokens con el motor habitual. |
+| `run_test` | `{ "file": "auth.yaml", "env": "dev", "variables": {} }` | `exitCode`, resumen, orden, status HTTP, tiempo y resultado booleano de cada assert. Autentica y captura tokens con el motor habitual. Con `httpi.yaml` ejecuta el proyecto entero (capturas, filas de datos y tokens OAuth) e indica el archivo de cada resultado. |
 
 Para una prueba completa, deja `node examples/server.mjs` ejecutándose en otra terminal,
 conecta el cliente y pide: **«Lista los flujos de Tsyce, inspecciona auth.yaml y
@@ -208,8 +325,11 @@ Permisos configurados por la persona que inicia el proceso:
 - La inspección devuelve metadatos del archivo; no pongas secretos en nombres, rutas
   de URL o nombres de headers. Los parámetros de una llamada pasan por el cliente/agente:
   usa referencias a variables para contraseñas en vez de enviarlas como literales.
-- Esta versión MCP rechaza redirects, multipart y tokens capturados en URLs; limita
-  cada request a 30 segundos. Para uploads y diagnóstico completo usa el CLI.
+- Esta versión MCP rechaza redirects, multipart y valores capturados en URLs; limita
+  cada request a 30 segundos. En un proyecto se comprueba cada request planificada
+  (fila por fila) y cada endpoint de tokens; el entorno que se usaría, el pedido o
+  `env.default`, debe estar en `--allow-env`. `httpi.local.yaml` no se puede leer por MCP.
+  Para uploads y diagnóstico completo usa el CLI.
   El límite de carpeta no es un sandbox del sistema operativo ni limita DNS o proxies.
 
 ## Comparativa de alternativas para probar APIs
@@ -226,7 +346,7 @@ API y exponer el propio runner a agentes son capacidades distintas.
 
 | Opción y fuente oficial | Cómo se trabaja y automatiza | IA/MCP verificado | Diferencia frente a Tsyce |
 |---|---|---|---|
-| **Tsyce / httpi** | Asistente de terminal con mouse; YAML/JSON ordenado; curl real; ambientes, asserts, Bearer capturado, CLI/JUnit. | Servidor local de cuatro herramientas sobre los mismos flujos. | Flujo pequeño y local; sin colaboración alojada, importación OpenAPI/Postman, scripting general o OAuth guiado. npm aún sin publicar. |
+| **Tsyce / httpi** | Asistente de terminal con mouse; proyecto en un `httpi.yaml`; curl real; ambientes, capturas, datos CSV/JSON, OAuth 2.0, importación curl/Postman/OpenAPI, CLI/JUnit. | Servidor local de cuatro herramientas sobre los mismos flujos y proyectos. | Local y basado en git; sin colaboración alojada ni scripting general. npm aún sin publicar. |
 | **[Postman](https://learning.postman.com/docs/tests-and-scripts/running-collections/intro-to-collection-runs/)** | Plataforma de colecciones, scripts, ejecución, colaboración y monitores. | [Servidor MCP para recursos Postman](https://learning.postman.com/docs/reference/postman-api/postman-mcp-server/overview); además genera servidores desde APIs. | Mayor amplitud y ecosistema. Hay que evaluar edición, credenciales y flujo local/cloud; MCP no es exclusivo de Tsyce. |
 | **[Bruno](https://www.usebruno.com/product/cli)** | Cliente de colecciones en archivos y CLI para CI. | [MCP oficial](https://github.com/usebruno/bruno-mcp) descubre/inspecciona y ejecuta mediante su CLI. | Competidor directo para colecciones locales y agentes; Tsyce apuesta por terminal guiada y curl. |
 | **[Insomnia / Inso](https://insomnia.rest/features/insomnia-cli)** | Cliente gráfico y CLI de pruebas/lint de APIs. | [Cliente MCP en Insomnia](https://developer.konghq.com/insomnia/mcp-clients-in-insomnia/); eso no demuestra un servidor que exponga Inso. | Plataforma gráfica más amplia; verificar por separado el control del runner desde agentes. |
@@ -262,12 +382,12 @@ Estas herramientas cubren necesidades relacionadas; no son sustitutos idénticos
 
 ### Evaluación de lo que tenemos
 
-Tsyce ya cubre el recorrido **crear mientras pruebas → guardar → repetir por ambiente →
-CI/JUnit → ejecutar desde agentes**, con un mismo motor y sin cuenta cloud. Sus límites
-actuales son concretos: captura de un Bearer JSON reservado, sin capturas generales,
-interfaz de archivos pendiente, sin OAuth guiado, importación OpenAPI/Postman, runner de
-carga, mocks de producto, contratos, colaboración de equipos ni auditoría centralizada.
-El servidor de ejemplo no equivale a un producto de mocks.
+Tsyce ya cubre el recorrido **importar o crear mientras pruebas → guardar → repetir por
+ambiente y por fila de datos → CI/JUnit → ejecutar desde agentes**, con un mismo motor y
+sin cuenta cloud. Sus límites actuales son concretos: sin runner de carga, mocks de
+producto, contratos, ejecución en paralelo, scripting, colaboración alojada ni auditoría
+centralizada (la colaboración es por git). El servidor de ejemplo no equivale a un
+producto de mocks.
 
 La hipótesis de diferenciación es la facilidad de convertir una prueba real en un flujo
 de terminal compartido entre personas y agentes. No se ha demostrado ventaja en velocidad,
@@ -277,12 +397,29 @@ mismo login + token + GET + POST + error intencional, mismo ambiente y CI; medir
 hasta el primer flujo reproducible, pasos manuales, claridad del fallo y manejo de secretos.
 Esa prueba entre productos queda pendiente; las capacidades anteriores son documentales.
 
-## Importar un curl
+## Importar un curl, una colección Postman o un documento OpenAPI
 
 ```bash
 httpi import curl.txt -o usuarios.yaml
 httpi import curl.txt --dialect cmd -o usuarios.yaml
+httpi import coleccion.postman_collection.json -o mi-api --environment staging.postman_environment.json
+httpi import openapi.yaml -o mi-api
+httpi import --pick -o mi-api      # elige el archivo en un explorador
 ```
+
+httpi detecta qué recibe; `--from curl|postman|openapi` lo fuerza. Una colección o un
+documento OpenAPI generan un proyecto: los tests van a `mi-api/tests/` y el entorno y
+los bloques `auth` a `mi-api/httpi.yaml`, que se crea o se completa sin reemplazar lo
+que ya tenga. Nunca se sobrescriben tests existentes.
+
+- **Postman v2.0/v2.1**: un archivo por carpeta de primer nivel; `{{variables}}` y la
+  autenticación heredada (bearer, basic, API key, OAuth 2.0) se conservan. El client
+  secret y los tokens guardados en la colección nunca se copian.
+- **OpenAPI 3.0/3.1**: un test por operación y un archivo por tag; `baseUrl` sale de
+  `servers`, el status esperado es el primer 2xx documentado, los bodies salen de los
+  ejemplos o se arman desde el esquema, y la seguridad pasa a variables o a bloques `auth`.
+- Todo lo que no se convierte (scripts de Postman, GraphQL, Swagger 2, `$ref` remotos,
+  flujos OAuth implicit o password…) se avisa por stderr, nunca se descarta en silencio.
 
 También acepta stdin: `cat curl.txt | httpi import -o usuarios.yaml` en Bash.
 Se detectan Bash, cmd y PowerShell; `--dialect` fuerza el dialecto. Los flags no
@@ -327,7 +464,8 @@ dev:
   baseUrl: http://127.0.0.1:3000
 ```
 
-`{{nombre}}` busca en **`--var` > entorno del sistema > archivo de entornos**.
+`{{nombre}}` busca en **`--var` > entorno del sistema > archivo de entornos**
+(en un proyecto, `httpi.local.yaml` va justo antes del entorno de `httpi.yaml`).
 `${NOMBRE}` solo lee el sistema. Una variable sin resolver es un error; los valores
 no se expanden recursivamente. En Windows, evita nombres como `path` y `username`
 en el archivo: pueden quedar tapados por las variables del sistema.
@@ -398,8 +536,9 @@ httpi run examples/users.yaml --env dev --reporter junit > results.xml
 ```
 
 [examples/github-actions.yml](examples/github-actions.yml) contiene un workflow completo:
-compila httpi, inicia la API local, ejecuta la prueba y sube el XML incluso si fallan
-asserts. En tu propio proyecto puedes usar el mismo comando contra tu API, sin el
+compila httpi, inicia la API local, ejecuta la prueba y el proyecto de
+[examples/proyecto](examples/proyecto) (con `httpi validate` antes) y sube los XML
+incluso si fallan asserts. En tu propio proyecto puedes usar el mismo comando contra tu API, sin el
 servidor de ejemplo. JUnit distingue `<failure>` (assert) de `<error>` (transporte).
 
 `npm run check` comprueba tipos, compila y ejecuta los tests. La CI del proyecto usa
@@ -411,7 +550,8 @@ la lista de procesos del sistema.
 ## Autocompletado del YAML
 
 El esquema publicado en [schema/httpi.schema.json](schema/httpi.schema.json) se
-genera desde zod en cada `npm run build`. Con la extensión YAML de VS Code,
+genera desde zod en cada `npm run build`; el de `httpi.yaml` está en
+[schema/httpi.project.schema.json](schema/httpi.project.schema.json). Con la extensión YAML de VS Code,
 añade un comentario al inicio del test (ajusta la ruta a tu archivo):
 
 ```yaml
@@ -423,5 +563,5 @@ También puedes usar la URL raw del esquema en GitHub. No añadas una propiedad
 personalizadas de JSONPath y regex se realizan al ejecutar httpi; el esquema del
 editor no sustituye la validación del runner.
 
-No incluye encadenamiento de requests, OAuth, GraphQL/gRPC, importación de OpenAPI/Postman ni scripting.
+No incluye GraphQL/gRPC, ejecución en paralelo, scripting, reportes HTML ni un servidor de colaboración.
 Consulta [PROGRESS.md](PROGRESS.md) para el avance y las limitaciones pendientes.

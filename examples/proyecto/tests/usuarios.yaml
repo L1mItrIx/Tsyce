@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=../../../schema/httpi.schema.json
+# httpi.yaml repite este archivo una vez por fila de data/usuarios.csv.
+version: 1
+name: Alta de usuario
+tests:
+  - name: Crear a {{data.nombre}}
+    request:
+      method: POST
+      url: "{{baseUrl}}/users"
+      body:
+        json: { name: "{{data.nombre}}" }
+    expect:
+      status: 201
+      json:
+        - { path: "$.name", equals: "{{data.nombre}}" }
+    capture:
+      userId: $.id
+  - name: Consultar el usuario {{userId}}
+    request:
+      url: "{{baseUrl}}/users/{{userId}}"
+    expect:
+      status: 200
+      json:
+        - { path: "$.id", type: number }

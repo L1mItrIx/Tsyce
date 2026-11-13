@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=../../../schema/httpi.schema.json
+version: 1
+name: Salud
+tests:
+  - name: La API responde
+    request:
+      url: "{{baseUrl}}/users"
+    expect:
+      status: 200
+      maxTimeMs: 2000

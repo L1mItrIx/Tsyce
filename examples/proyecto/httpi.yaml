@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=../../schema/httpi.project.schema.json
+# Proyecto completo de ejemplo. Con la API de ejemplo en marcha (node examples/server.mjs):
+#   DEMO_CLIENT_SECRET=demo-secret httpi run
+version: 1
+name: API de ejemplo
+env:
+  default: local
+  environments:
+    local:
+      baseUrl: http://127.0.0.1:3000
+auth:
+  demo:
+    type: oauth2
+    flow: client_credentials
+    tokenUrl: "{{baseUrl}}/oauth/token"
+    clientId: demo-client
+    clientSecret: ${DEMO_CLIENT_SECRET}
+run:
+  - tests/salud.yaml
+  - file: tests/usuarios.yaml
+    data: data/usuarios.csv
+  - tests/admin.yaml
+report:
+  junit: reports/junit.xml

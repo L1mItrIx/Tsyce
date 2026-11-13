@@ -1,3 +1,6 @@
 node_modules/
 dist/
 coverage/
+examples/proyecto/reports/
+examples/proyecto/.httpi/
+examples/proyecto/httpi.local.yaml

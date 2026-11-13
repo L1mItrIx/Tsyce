@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=../../../schema/httpi.schema.json
+version: 1
+name: Administración
+tests:
+  - name: Estadísticas con el token OAuth
+    request:
+      url: "{{baseUrl}}/admin/stats"
+      auth: demo
+    expect:
+      status: 200
+      json:
+        - { path: "$.users", type: number }
