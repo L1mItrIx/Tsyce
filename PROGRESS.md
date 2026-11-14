@@ -192,6 +192,8 @@ Una línea por decisión que no esté en `PLAN.md`: fecha, qué, por qué.
 
 - 2026-11-14 — U8 solicitada por el usuario: `probar.cmd` en la raíz ejecuta un YAML/JSON arrastrado o pasado como argumento; sin argumento toma `httpi.yaml` junto al lanzador y, si falta, el proyecto remoto de `examples/remotas/`. Usa el CLI compilado sin npm link, muestra respuestas/asserts/resumen, conserva 0/1/2/3 y pausa para leer el resultado (HTTPI_NO_PAUSE=1 lo omite). No registra asociaciones de archivos ni instala nada. Demo GET/POST/PUT/PATCH/DELETE con datos ficticios contra JSONPlaceholder; requiere internet y sus escrituras no persisten. Node/build ausentes se explican con salida 2. Revisión independiente del lanzador y harness cmd; se corrige quoting nativo y se comprueba el prompt de pausa sin asumir idioma de Windows. Check local: 760 tests, más 11 escenarios nativos Windows definidos para CI; ejemplo remoto ejecutado realmente: cinco tests pasaron, salida 0. README aclara uso y diferencia entre FastAPI/pytest/TestClient y un runner HTTP externo; no se afirma superioridad ni benchmark sin medir.
 
+- 2026-11-14 — CI U8: Ubuntu/macOS pasaron y Windows detectó que el harness enviaba literalmente `%HTTPI_TEST_FILE%` en los casos sin argumento, porque cmd /c no expande esa variable vacía como se asumió. Se omite por completo el argumento en los escenarios de doble clic y se exige el diagnóstico de proyecto inválido en su prueba para evitar un falso positivo. El lanzador no cambia; los demás escenarios nativos con rutas especiales y códigos de salida ya pasaron. No se relajan asserts ni se suben timeouts.
+
 ## Backlog (fuera de la tarea actual)
 Ideas que surgieron y no se hicieron. No implementar sin aprobación.
 

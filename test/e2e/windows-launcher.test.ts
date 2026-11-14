@@ -63,7 +63,9 @@ test.each(nativeCases)('Windows double-click launcher: %s', async (scenario) => 
   const env = { ...process.env, HTTPI_NO_PAUSE: scenario === 'pause' ? '' : '1', HTTPI_TEST_SCRIPT: script, HTTPI_TEST_FILE: target, HTTPI_TEST_TRAP: 'MUST_NOT_EXPAND' };
   if (scenario === 'missing-node') for (const key of Object.keys(env)) if (key.toLowerCase() === 'path') env[key as keyof typeof env] = '';
   const result = await new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
-    const child = spawn(process.env.ComSpec ?? 'cmd.exe', ['/d', '/s', '/c', '""%HTTPI_TEST_SCRIPT%" "%HTTPI_TEST_FILE%""'], { env, windowsVerbatimArguments: true });
+    // cmd /c preserves an undefined %VARIABLE% literally; a double click passes no argument at all.
+    const command = target === '' ? '""%HTTPI_TEST_SCRIPT%""' : '""%HTTPI_TEST_SCRIPT%" "%HTTPI_TEST_FILE%""';
+    const child = spawn(process.env.ComSpec ?? 'cmd.exe', ['/d', '/s', '/c', command], { env, windowsVerbatimArguments: true });
     let stdout = ''; let stderr = '';
     child.stdout.setEncoding('utf8').on('data', (chunk: string) => { stdout += chunk; });
     child.stderr.setEncoding('utf8').on('data', (chunk: string) => { stderr += chunk; });
@@ -75,5 +77,9 @@ test.each(nativeCases)('Windows double-click launcher: %s', async (scenario) => 
   expect(result.stdout).toContain(expected === 0 ? 'ALL TESTS PASSED' : expected === 1 ? 'TESTS FAILED' : expected === 2 ? 'COULD NOT RUN' : 'CONNECTION OR AUTHENTICATION ERROR');
   if (scenario === 'pause') expect(result.stdout).toContain(pausePrompt);
   else expect(result.stdout).not.toContain(pausePrompt);
-  if (scenario === 'invalid') expect(result.stdout).not.toContain('Running the public remote demo');
+  if (scenario === 'invalid') {
+    expect(result.stdout).not.toContain('Running the public remote demo');
+    expect(result.stderr).toContain('httpi.yaml');
+    expect(result.stderr).toContain('invalid project');
+  }
 });
