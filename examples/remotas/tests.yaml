@@ -1,0 +1,56 @@
+# yaml-language-server: $schema=../../schema/httpi.schema.json
+# JSONPlaceholder simula las escrituras; no guarda registros nuevos ni modifica los existentes.
+version: 1
+name: GET POST PUT PATCH DELETE remotos
+tests:
+  - name: GET consultar una publicacion
+    request:
+      method: GET
+      url: "{{baseUrl}}/posts/1"
+      timeoutMs: 20000
+    expect:
+      status: 200
+      json:
+        - { path: $.id, equals: 1 }
+        - { path: $.title, type: string }
+  - name: POST crear una publicacion simulada
+    request:
+      method: POST
+      url: "{{baseUrl}}/posts"
+      timeoutMs: 20000
+      body:
+        json: { title: Prueba Tsyce, body: Hola desde Tsyce, userId: 1 }
+    expect:
+      status: 201
+      json:
+        - { path: $.title, equals: Prueba Tsyce }
+        - { path: $.id, type: number }
+  - name: PUT reemplazar una publicacion simulada
+    request:
+      method: PUT
+      url: "{{baseUrl}}/posts/1"
+      timeoutMs: 20000
+      body:
+        json: { id: 1, title: Titulo completo, body: Contenido nuevo, userId: 1 }
+    expect:
+      status: 200
+      json:
+        - { path: $.title, equals: Titulo completo }
+  - name: PATCH cambiar solo el titulo
+    request:
+      method: PATCH
+      url: "{{baseUrl}}/posts/1"
+      timeoutMs: 20000
+      body:
+        json: { title: Titulo modificado }
+    expect:
+      status: 200
+      json:
+        - { path: $.title, equals: Titulo modificado }
+  - name: DELETE borrar de forma simulada
+    request:
+      method: DELETE
+      url: "{{baseUrl}}/posts/1"
+      timeoutMs: 20000
+    expect:
+      status: 200

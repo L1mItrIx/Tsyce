@@ -44,6 +44,46 @@ npm publish --access public
 
 La versión preparada es **0.1.0**. No hay publicación automática configurada.
 
+## Ejecutar con doble clic en Windows
+
+Desde el repositorio instalado, compila una vez con `npm.cmd run build` y abre
+**`probar.cmd`** con doble clic. Necesita Node.js 22+ y curl, igual que el CLI.
+
+- Si existe `httpi.yaml` junto al lanzador, ejecuta ese proyecto.
+- Si no existe, ejecuta `examples/remotas/httpi.yaml`: cinco requests GET, POST,
+  PUT, PATCH y DELETE contra [JSONPlaceholder](https://jsonplaceholder.typicode.com/guide/).
+  No necesitas un servidor local ni Postman; sí conexión a internet. Las escrituras
+  son simuladas, no se guardan, y el ejemplo solo envía datos ficticios.
+- Para ejecutar otro YAML/JSON, **arrástralo sobre `probar.cmd`** o pasa su ruta:
+
+```powershell
+.\probar.cmd "D:\Mis pruebas\flujo.yaml"
+```
+
+El lanzador muestra las respuestas, asserts y resumen del motor habitual, imprime
+`ALL TESTS PASSED` si la salida es 0 y conserva 1/2/3 para fallos de validación,
+configuración o conexión/autenticación. Deja la ventana abierta para leer el resultado.
+`HTTPI_NO_PAUSE=1` omite la pausa cuando se usa en automatización.
+
+No hace falta `npm link`: usa el `dist/cli.js` del mismo repositorio. Conserva el
+lanzador en la raíz de Tsyce; no es un ejecutable independiente. No cambia asociaciones
+de Windows: abrir un `.yaml` directamente seguirá usando tu editor habitual.
+
+También puedes ejecutar el mismo ejemplo desde cualquier sistema:
+
+```bash
+httpi run examples/remotas/httpi.yaml --show-response
+```
+
+**FastAPI y Tsyce cubren trabajos distintos:** FastAPI construye y sirve una API
+en Python; Tsyce envía peticiones a una API y verifica sus respuestas. Puedes probar
+una API creada con FastAPI usando estos mismos flujos. El valor a comparar frente
+a Postman, Bruno o Hurl es la facilidad de crear, repetir y mantener pruebas, no la
+velocidad con que FastAPI sirve endpoints. FastAPI también documenta pruebas por
+código con [pytest y TestClient](https://fastapi.tiangolo.com/tutorial/testing/);
+Tsyce permite verificar una API desplegada mediante flujos YAML sin escribir Python.
+No se ha ejecutado un benchmark entre ambos.
+
 ## Un proyecto en un solo YAML
 
 ```bash

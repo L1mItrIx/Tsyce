@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=../../schema/httpi.project.schema.json
+version: 1
+name: Practica de API remota
+env:
+  default: public
+  environments:
+    public:
+      baseUrl: https://jsonplaceholder.typicode.com
+run:
+  - tests.yaml
